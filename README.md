@@ -54,13 +54,11 @@ nav-adjust-go-lib (根包门面)
 ├── model/       公共输入、输出、矩阵和 JSON 数据契约；不依赖求解器
 ├── network/     ENU 站网校验、拓扑、方程组装、求解和结果映射
 ├── core/        求解器无关的线性方程、约束和底层结果模型
-├── batch/       批处理加权最小二乘及协方差块求解
-├── internal/sparse/ CSR 对称稀疏矩阵、投影、Jacobi/块 Jacobi-PCG 求解
-├── quality/     卡方检验和残差质量工具
+├── batch/       批处理加权最小二乘、通用 Huber 重加权及协方差块求解
 ├── nonlinear/   通用 Gauss-Newton 迭代能力
-├── robust/      通用 Huber 迭代重加权能力
-├── variance/    通用分组协方差尺度更新能力
-└── sequential/  通用线性 Kalman 能力
+└── internal/
+    ├── sparse/      CSR 对称稀疏矩阵、投影、Jacobi/块 Jacobi/IC(0)-PCG
+    └── statistics/  站网内部卡方检验与方差分量尺度更新
 ```
 
 依赖方向保持单向：
@@ -69,14 +67,24 @@ nav-adjust-go-lib (根包门面)
 调用方 → model
 调用方 → network → model
                  → batch → core
-                 → quality → core
+                 → internal/statistics → core
 根包门面 → model + network
 ```
 
 - 只负责存储、传输或 JSON 解析的代码可以仅依赖 `model`；
 - 站间 ENU 向量业务直接依赖 `model + network`；
 - 根包保留 `SolveENUNetwork` 等完整名称，适合简单调用和向后兼容；
-- `core/`、`batch/` 等目录是可复用数值层，不依赖任何 RTK 或站点业务类型。
+- `core/`、`batch/` 和 `nonlinear/` 是可复用数值层，不依赖任何 RTK 或站点业务类型；统计与稀疏实现收在 `internal/`，不构成公共 API。
+
+目录收敛后的 API 变化：
+
+| 原入口 | 当前入口或处理方式 |
+| --- | --- |
+| `robust.SolveHuber`、`robust.SolveHuberContext` | `batch.SolveHuber`、`batch.SolveHuberContext` |
+| `robust.HuberOptions`、`robust.Result` | `batch.HuberOptions`、`batch.HuberResult` |
+| `quality`、`variance` | 收入 `internal/statistics`，站网调用方通过 `network` 结果和选项使用 |
+| `sequential` | 已删除；库不再提供 Kalman 预测和更新 |
+| `nonlinear` | 保持独立公共包和原有导入路径 |
 
 ## 最小示例
 
@@ -295,20 +303,32 @@ if errors.Is(err, context.DeadlineExceeded) {
 
 ## 大型站网与稀疏求解
 
-默认配置仍使用稠密 Cholesky 和完整协方差，保持已有调用行为不变。参数较多时，可显式启用 CSR 稀疏法方程和 PCG。ENU 网络默认使用连续站点 E/N/U 三参数组成的 `3×3` 块 Jacobi 预条件器；也可以显式选择标量 Jacobi：
+默认配置仍使用稠密 Cholesky 和完整协方差，保持已有调用行为不变。`SolverAuto` 是显式选择，不会改变零值行为：请求完整协方差时始终使用稠密法；使用精简协方差且参数数不超过 `DenseThreshold`（默认 300）时使用稠密法；参数更多时切换为 CSR 稀疏 PCG。网络层的自动模式默认使用 IC(0) 预条件器，显式 `SolverPCG` 仍默认使用连续站点 E/N/U 三参数组成的 `3×3` 块 Jacobi：
 
 ```go
 result, err := network.Solve(problem, &model.Options{
     Solver: model.SolverOptions{
-        Method:            model.SolverPCG,
-        Preconditioner:    model.PreconditionerBlockJacobi, // ENU 网络默认值
-        MaxIterations:     5000,  // 0 表示按参数规模自动选择
-        RelativeTolerance: 1e-10, // 0 表示使用默认值
-        AbsoluteTolerance: 1e-12, // 0 表示使用默认值
+        Method:              model.SolverAuto,
+        DenseThreshold:      300,
+        Preconditioner:      model.PreconditionerIC0, // Auto 的网络默认值
+        PreconditionerShift: 1e-9,
+        MaxIterations:       5000,  // 0 表示按参数规模自动选择
+        RelativeTolerance:   1e-10, // 0 表示使用默认值
+        AbsoluteTolerance:   1e-12, // 0 表示使用默认值
     },
     Covariance: model.CovarianceStationBlocks,
 })
 ```
+
+自动模式的实际选择如下：
+
+| 配置 | 实际求解器 |
+| --- | --- |
+| `SolverAuto + CovarianceFull` | 稠密 Cholesky/KKT，不受阈值影响 |
+| `SolverAuto + reduced covariance + parameters <= DenseThreshold` | 稠密 Cholesky/KKT |
+| `SolverAuto + reduced covariance + parameters > DenseThreshold` | 稀疏 PCG/投影 PCG，网络默认 IC(0) |
+
+IC(0) 仅使用法方程已有的稀疏模式构造不完全 Cholesky 预条件器，不是直接稀疏 Cholesky 求解器，也不改变最终求解的方程。`PreconditionerShift` 是相对于法方程对角线的稳定化位移，默认 `1e-9`；极病态网形若在构造预条件器时出现非正主元，可适当提高该值，或显式切换为 `PreconditionerBlockJacobi`。
 
 协方差模式决定内存与诊断完整度：
 
@@ -320,9 +340,9 @@ result, err := network.Solve(problem, &model.Options{
 
 `station-blocks` 不构造完整逆矩阵。它通过重复 PCG 求解，仅提取每个站点以及实际基线/先验涉及的逆法方程元素；内存随稀疏法方程和站网边数增长，但计算时间会高于 `none`。`none` 仍返回坐标、原始残差、`Objective`、`Sigma0`、自由度和全局卡方检验；协方差派生的标准差、标准化残差与冗余度保持零值，并由 `Diagnostics.*Available` 明确标识为不可用。
 
-PCG 的 `Diagnostics.ConditionNumberAvailable` 为 `false`，因为迭代法不虚构精确条件数；`SolverPreconditioner` 报告实际使用的预条件器，应结合 `SolverIterations` 和 `SolverRelativeResidual` 判断收敛质量。未达到容差会返回可通过 `errors.Is(err, network.ErrNotConverged)` 判断的错误。存在精确约束时，库只对规模通常很小的约束 Gram 矩阵 `CCᵀ` 做稠密 Cholesky，并在约束零空间内执行稀疏 PCG；坐标求解和按需受约束协方差都不构造参数规模的稠密 KKT。约束线性相关时返回 `ErrRankDeficient`。
+PCG 的 `Diagnostics.ConditionNumberAvailable` 为 `false`，因为迭代法不虚构精确条件数；`Diagnostics.Solver` 报告自动模式实际选中的直接法或迭代法，`SolverPreconditioner` 报告实际使用的 `jacobi`、`block-jacobi` 或 `ic0`，应结合 `SolverIterations` 和 `SolverRelativeResidual` 判断收敛质量。未达到容差会返回可通过 `errors.Is(err, network.ErrNotConverged)` 判断的错误。存在精确约束时，库只对规模通常很小的约束 Gram 矩阵 `CCᵀ` 做稠密 Cholesky，并在约束零空间内执行稀疏 PCG；坐标求解和按需受约束协方差都不构造参数规模的稠密 KKT。约束线性相关时返回 `ErrRankDeficient`。
 
-底层 `batch.Solve` 同样支持 `batch.Options{Solver: batch.SolverPCG, Covariance: batch.CovarianceNone}`，通用批处理默认使用标量 Jacobi；若参数天然连续成组，可设置 `PreconditionerBlockJacobi` 和正的 `PreconditionerBlockSize`。需要少量局部逆矩阵元素时，可使用 `batch.SolveDetailed` 的 `FormalCovarianceBlock` 或 `FormalCovarianceValues`，而不必生成完整逆矩阵；这些 API 也分别提供 `SolveDetailedContext`、`FormalCovarianceBlockContext` 和 `FormalCovarianceValuesContext`。
+底层 `batch.Solve` 同样支持 `batch.Options{Solver: batch.SolverAuto, DenseThreshold: 300, Covariance: batch.CovarianceNone}`。通用批处理默认使用标量 Jacobi；若参数天然连续成组，可设置 `PreconditionerBlockJacobi` 和正的 `PreconditionerBlockSize`，也可显式选择 `PreconditionerIC0`。需要少量局部逆矩阵元素时，可使用 `batch.SolveDetailed` 的 `FormalCovarianceBlock` 或 `FormalCovarianceValues`，而不必生成完整逆矩阵；这些 API 也分别提供 `SolveDetailedContext`、`FormalCovarianceBlockContext` 和 `FormalCovarianceValuesContext`。
 
 ## 方差分量估计
 
@@ -401,7 +421,7 @@ result, err := network.Solve(problem, &model.Options{
 | `Diagnostics.Sigma0` | 后验单位权中误差 |
 | `Diagnostics.SolverIterations` | PCG 参数求解迭代次数；直接法为 0 |
 | `Diagnostics.SolverRelativeResidual` | PCG 参数求解最终相对残差 |
-| `Diagnostics.SolverPreconditioner` | PCG 实际使用的 `jacobi` 或 `block-jacobi`；直接法为空 |
+| `Diagnostics.SolverPreconditioner` | PCG 实际使用的 `jacobi`、`block-jacobi` 或 `ic0`；直接法为空 |
 | `Diagnostics.DatumMode` | 外部基准或零质心自由网基准 |
 | `Diagnostics.FreeDatumComponentCount` | 使用零质心内部基准的连通分量数 |
 | `Diagnostics.InternalDatumConstraintCount` | 为自由分量加入的内部基准约束数 |
@@ -499,13 +519,13 @@ case errors.Is(err, network.ErrInvalidProblem):
 - 不负责接收机原始观测、星历、差分、模糊度或 RTK 解算；
 - 固定站按精确坐标处理；有不确定度的控制点应通过 `Priors` 提供；
 - 支持一条基线内部 E/N/U 相关，不支持不同基线之间的交叉协方差；
-- 默认稠密模式适合中小站网；大型站网可选稀疏 PCG。ENU 网络默认使用站点 `3×3` 块 Jacobi，也可选标量 Jacobi；极弱网形、长链或病态站网仍可能需要较多迭代；
+- 默认稠密模式适合中小站网；大型站网可显式选择自动模式或稀疏 PCG。自动模式默认 IC(0)，显式 PCG 默认站点 `3×3` 块 Jacobi；IC(0) 可能在极病态矩阵上发生不完全分解主元失效，此时应提高稳定化位移或切换块 Jacobi；
 - 精确约束 PCG 需要稠密分解约束 Gram 矩阵，适合约束数远少于参数数的场景；若业务创建了大量全局精确约束，其约束层内存和计算量会按约束数增长；
 - 方差分量估计当前以完整 ENU 基线组为单位，只估计各组协方差的共同尺度，不分别估计 E/N/U 分量，也不估计控制点先验尺度；
 - 自由网当前支持每个无基准连通分量的零质心内部基准，不包含拟稳基准、最小迹基准或求解后的 S 变换；
 - 尚未实现速度网和多历元动态模型。
 
-`core/`、`batch/`、`nonlinear/`、`robust/`、`variance/`、`quality/` 和 `sequential/` 保留了底层数值能力，供高级用法扩展；面向站间 ENU 向量网时应优先使用 `model + network` API。
+`core/`、`batch/` 和 `nonlinear/` 保留了底层数值能力，供高级用法扩展；通用线性 Huber 入口现在是 `batch.SolveHuber`。面向站间 ENU 向量网时应优先使用 `model + network` API。本库聚焦静态平差，不再提供 Kalman 序贯滤波。
 
 ## 验证
 
@@ -514,8 +534,10 @@ go test ./...
 go test -race ./...
 go vet ./...
 go run ./examples/enu-network
-go test ./network -run=^$ -bench=BenchmarkSparsePCGChain500 -benchmem
-go test ./network -run=^$ -fuzz=FuzzValidateAndSolveMinimalENU
+go run ./examples/spp
+go test ./network -run=^$ -bench=BenchmarkAutoIC0Chain10000 -benchtime=1x -benchmem
 ```
 
-测试覆盖闭合站网、非零固定站、全固定站网、软控制点基准、固定站与控制点混合、相关先验协方差、零质心自由网、无基准连通分量、非法协方差、输入不可变、JSON 往返、整条基线鲁棒降权、分组方差尺度估计、精确约束投影 PCG、块 Jacobi、上下文取消与大型稀疏自由网；同时提供大型链网 benchmark 和最小 ENU 网络 fuzz 入口。
+`BenchmarkAutoIC0Chain10000` 构造 10,000 个站点、约 30,000 个参数的链网，输入在计时前创建，求解使用 `SolverAuto + CovarianceNone`。2026-08-19 在 Apple M4 上三次固定迭代的参考结果约为 `38.5 ms/op`、`107 MB/op`、`490,431 allocs/op`；该数据只用于观察版本间趋势，具体耗时和分配会随 Go 版本、硬件与网形变化。
+
+当前自动化测试覆盖根包普通站网、坐标先验、零质心自由网入口，IC(0) 分解与失效边界，自动求解器的稠密/稀疏/完整协方差选择、显式预条件器优先级、投影 PCG 以及公共配置校验；同时提供万站 IC(0) 链网 benchmark。

@@ -12,6 +12,9 @@ type PreconditionerMethod string
 const (
 	// SolverDense uses dense Cholesky or constrained KKT factorization.
 	SolverDense SolverMethod = "dense"
+	// SolverAuto uses dense factorization for full covariance or small systems,
+	// and sparse PCG for larger systems with reduced covariance output.
+	SolverAuto SolverMethod = "auto"
 	// SolverPCG uses a sparse normal matrix and preconditioned conjugate
 	// gradients. Exact constraints are handled by null-space projection.
 	SolverPCG SolverMethod = "pcg"
@@ -20,6 +23,7 @@ const (
 const (
 	PreconditionerJacobi      PreconditionerMethod = "jacobi"
 	PreconditionerBlockJacobi PreconditionerMethod = "block-jacobi"
+	PreconditionerIC0         PreconditionerMethod = "ic0"
 )
 
 // CovarianceMode controls whether Solve materializes the complete inverse
@@ -41,12 +45,18 @@ type Options struct {
 	MinVariance float64
 	// Solver selects dense or sparse-PCG solution. The default is dense.
 	Solver SolverMethod
-	// Preconditioner selects scalar Jacobi or consecutive block Jacobi for
-	// PCG. Direct batch use defaults to scalar Jacobi.
+	// DenseThreshold is the maximum parameter count solved densely by
+	// SolverAuto. The default is 300.
+	DenseThreshold int
+	// Preconditioner selects scalar Jacobi, consecutive block Jacobi, or IC(0)
+	// for PCG. Direct batch use defaults to scalar Jacobi.
 	Preconditioner PreconditionerMethod
 	// PreconditionerBlockSize is required by block Jacobi. ENU networks set it
 	// to three so each free station is one block.
 	PreconditionerBlockSize int
+	// PreconditionerShift is the relative diagonal stabilization used by IC(0).
+	// The default is 1e-9.
+	PreconditionerShift float64
 	// Covariance controls complete covariance materialization. The default is
 	// full to preserve the historical Solve contract.
 	Covariance CovarianceMode
@@ -70,11 +80,17 @@ func (o Options) withDefaults() Options {
 	if o.Solver == "" {
 		o.Solver = SolverDense
 	}
+	if o.DenseThreshold == 0 {
+		o.DenseThreshold = 300
+	}
 	if o.Preconditioner == "" {
 		o.Preconditioner = PreconditionerJacobi
 	}
 	if o.Covariance == "" {
 		o.Covariance = CovarianceFull
+	}
+	if o.Preconditioner == PreconditionerIC0 && o.PreconditionerShift == 0 {
+		o.PreconditionerShift = 1e-9
 	}
 	if o.RelativeTolerance == 0 {
 		o.RelativeTolerance = 1e-10
@@ -96,10 +112,13 @@ func normalizeOptions(options *Options) (Options, error) {
 	if normalized.MinVariance < 0 || math.IsNaN(normalized.MinVariance) || math.IsInf(normalized.MinVariance, 0) {
 		return Options{}, invalid("minimum variance must be finite and non-negative")
 	}
-	if normalized.Solver != "" && normalized.Solver != SolverDense && normalized.Solver != SolverPCG {
+	if normalized.Solver != "" && normalized.Solver != SolverDense && normalized.Solver != SolverAuto && normalized.Solver != SolverPCG {
 		return Options{}, invalid("unsupported solver %q", normalized.Solver)
 	}
-	if normalized.Preconditioner != "" && normalized.Preconditioner != PreconditionerJacobi && normalized.Preconditioner != PreconditionerBlockJacobi {
+	if normalized.DenseThreshold < 0 {
+		return Options{}, invalid("dense threshold must be non-negative")
+	}
+	if normalized.Preconditioner != "" && normalized.Preconditioner != PreconditionerJacobi && normalized.Preconditioner != PreconditionerBlockJacobi && normalized.Preconditioner != PreconditionerIC0 {
 		return Options{}, invalid("unsupported preconditioner %q", normalized.Preconditioner)
 	}
 	if normalized.PreconditionerBlockSize < 0 {
@@ -107,6 +126,9 @@ func normalizeOptions(options *Options) (Options, error) {
 	}
 	if normalized.Preconditioner == PreconditionerBlockJacobi && normalized.PreconditionerBlockSize == 0 {
 		return Options{}, invalid("block-Jacobi preconditioner requires a positive block size")
+	}
+	if normalized.PreconditionerShift < 0 || math.IsNaN(normalized.PreconditionerShift) || math.IsInf(normalized.PreconditionerShift, 0) {
+		return Options{}, invalid("preconditioner shift must be finite and non-negative")
 	}
 	if normalized.Covariance != "" && normalized.Covariance != CovarianceFull && normalized.Covariance != CovarianceNone {
 		return Options{}, invalid("unsupported covariance mode %q", normalized.Covariance)

@@ -62,28 +62,41 @@ func normalizeNetworkOptions(options *ENUNetworkOptions) (networkOptions, error)
 		return networkOptions{}, validationError(nil, "options.condition_warn_limit", "", "must be positive")
 	}
 	result.batch = batch.Options{
-		SymmetryTolerance: public.SymmetryTolerance,
-		MinVariance:       public.MinimumVariance,
-		MaxIterations:     public.Solver.MaxIterations,
-		RelativeTolerance: public.Solver.RelativeTolerance,
-		AbsoluteTolerance: public.Solver.AbsoluteTolerance,
+		SymmetryTolerance:   public.SymmetryTolerance,
+		MinVariance:         public.MinimumVariance,
+		DenseThreshold:      public.Solver.DenseThreshold,
+		MaxIterations:       public.Solver.MaxIterations,
+		RelativeTolerance:   public.Solver.RelativeTolerance,
+		AbsoluteTolerance:   public.Solver.AbsoluteTolerance,
+		PreconditionerShift: public.Solver.PreconditionerShift,
 	}
 	switch public.Solver.Method {
 	case "", SolverDense:
 		result.batch.Solver = batch.SolverDense
+	case SolverAuto:
+		result.batch.Solver = batch.SolverAuto
 	case SolverPCG:
 		result.batch.Solver = batch.SolverPCG
 	default:
-		return networkOptions{}, validationError(ErrUnsupportedMethod, "options.solver.method", string(public.Solver.Method), "only dense and pcg are supported")
+		return networkOptions{}, validationError(ErrUnsupportedMethod, "options.solver.method", string(public.Solver.Method), "only dense, auto, and pcg are supported")
 	}
 	switch public.Solver.Preconditioner {
-	case "", PreconditionerBlockJacobi:
+	case "":
+		if public.Solver.Method == SolverAuto {
+			result.batch.Preconditioner = batch.PreconditionerIC0
+		} else {
+			result.batch.Preconditioner = batch.PreconditionerBlockJacobi
+			result.batch.PreconditionerBlockSize = 3
+		}
+	case PreconditionerBlockJacobi:
 		result.batch.Preconditioner = batch.PreconditionerBlockJacobi
 		result.batch.PreconditionerBlockSize = 3
 	case PreconditionerJacobi:
 		result.batch.Preconditioner = batch.PreconditionerJacobi
+	case PreconditionerIC0:
+		result.batch.Preconditioner = batch.PreconditionerIC0
 	default:
-		return networkOptions{}, validationError(ErrUnsupportedMethod, "options.solver.preconditioner", string(public.Solver.Preconditioner), "only jacobi and block-jacobi are supported")
+		return networkOptions{}, validationError(ErrUnsupportedMethod, "options.solver.preconditioner", string(public.Solver.Preconditioner), "only jacobi, block-jacobi, and ic0 are supported")
 	}
 	if result.covariance == CovarianceFull {
 		result.batch.Covariance = batch.CovarianceFull
@@ -98,6 +111,12 @@ func normalizeNetworkOptions(options *ENUNetworkOptions) (networkOptions, error)
 	}
 	if public.Solver.MaxIterations < 0 {
 		return networkOptions{}, validationError(nil, "options.solver.max_iterations", "", "must be non-negative")
+	}
+	if public.Solver.DenseThreshold < 0 {
+		return networkOptions{}, validationError(nil, "options.solver.dense_threshold", "", "must be non-negative")
+	}
+	if public.Solver.PreconditionerShift < 0 || !finite(public.Solver.PreconditionerShift) {
+		return networkOptions{}, validationError(nil, "options.solver.preconditioner_shift", "", "must be finite and non-negative")
 	}
 	if public.Solver.RelativeTolerance < 0 || !finite(public.Solver.RelativeTolerance) {
 		return networkOptions{}, validationError(nil, "options.solver.relative_tolerance", "", "must be non-negative")

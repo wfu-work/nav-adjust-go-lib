@@ -115,6 +115,7 @@ func SolveDetailedContext(ctx context.Context, problem adjust.Problem, options *
 	if err != nil {
 		return nil, err
 	}
+	solver := resolveSolver(opts, compiled.parameters)
 
 	var delta []float64
 	var provider covarianceProvider
@@ -124,7 +125,7 @@ func SolveDetailedContext(ctx context.Context, problem adjust.Problem, options *
 	iterations := 0
 	relativeResidual := 0.0
 
-	if opts.Solver == SolverPCG {
+	if solver == SolverPCG {
 		normal, buildErr := buildSparseNormal(ctx, compiled)
 		if buildErr != nil {
 			return nil, buildErr
@@ -399,10 +400,24 @@ func contextError(ctx context.Context) error {
 }
 
 func makePreconditioner(matrix *sparse.Matrix, options Options, project sparse.ProjectFunc) (sparse.Preconditioner, error) {
-	if options.Preconditioner == PreconditionerBlockJacobi {
+	switch options.Preconditioner {
+	case PreconditionerBlockJacobi:
 		return sparse.NewBlockJacobiPreconditioner(matrix, options.PreconditionerBlockSize, project)
+	case PreconditionerIC0:
+		return sparse.NewIncompleteCholeskyPreconditioner(matrix, options.PreconditionerShift)
+	default:
+		return sparse.NewJacobiPreconditioner(matrix, project)
 	}
-	return sparse.NewJacobiPreconditioner(matrix, project)
+}
+
+func resolveSolver(options Options, parameterCount int) SolverMethod {
+	if options.Solver != SolverAuto {
+		return options.Solver
+	}
+	if options.Covariance == CovarianceFull || parameterCount <= options.DenseThreshold {
+		return SolverDense
+	}
+	return SolverPCG
 }
 
 func providerPCGOptions(provider covarianceProvider) (sparse.PCGOptions, bool) {

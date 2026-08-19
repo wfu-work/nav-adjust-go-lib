@@ -8,7 +8,7 @@ import (
 
 	"github.com/wfu-work/nav-adjust-go-lib/batch"
 	"github.com/wfu-work/nav-adjust-go-lib/core"
-	"github.com/wfu-work/nav-adjust-go-lib/variance"
+	"github.com/wfu-work/nav-adjust-go-lib/internal/statistics"
 	"gonum.org/v1/gonum/mat"
 )
 
@@ -156,7 +156,7 @@ func solveVarianceComponentNetwork(ctx context.Context, compiled compiledNetwork
 	for _, group := range groups {
 		scales[group] = 1
 	}
-	varianceOptions := variance.Options{
+	varianceOptions := statistics.VarianceOptions{
 		Tolerance: options.tolerance, MinScale: options.minScale, MaxScale: options.maxScale,
 		MinimumRedundancy: options.minimumRedundancy,
 	}
@@ -178,7 +178,7 @@ func solveVarianceComponentNetwork(ctx context.Context, compiled compiledNetwork
 		if err != nil {
 			return networkSolve{}, fmt.Errorf("adjust: variance-component iteration %d: %w", iteration, err)
 		}
-		update, err := variance.UpdateGroupScales(components, varianceOptions)
+		update, err := statistics.UpdateGroupScales(components, varianceOptions)
 		if err != nil {
 			return networkSolve{}, fmt.Errorf("adjust: variance-component iteration %d: %w", iteration, err)
 		}
@@ -239,14 +239,14 @@ func varianceComponentStatistics(
 	groups []string,
 	scales map[string]float64,
 	baselineCount int,
-) ([]variance.Component, error) {
+) ([]statistics.VarianceComponent, error) {
 	formal, err := queryNetworkCovariance(ctx, solution.detailed, solution.problem, compiled.stationIndex)
 	if err != nil {
 		return nil, err
 	}
-	byGroup := make(map[string]*variance.Component, len(groups))
+	byGroup := make(map[string]*statistics.VarianceComponent, len(groups))
 	for _, group := range groups {
-		byGroup[group] = &variance.Component{ID: group, Scale: scales[group]}
+		byGroup[group] = &statistics.VarianceComponent{ID: group, Scale: scales[group]}
 	}
 	for i := 0; i < baselineCount; i++ {
 		if err := ctx.Err(); err != nil {
@@ -270,7 +270,7 @@ func varianceComponentStatistics(
 		component.Objective += objective
 		component.Redundancy += redundancy
 	}
-	components := make([]variance.Component, len(groups))
+	components := make([]statistics.VarianceComponent, len(groups))
 	for i, group := range groups {
 		components[i] = *byGroup[group]
 	}
@@ -306,7 +306,7 @@ func blockVarianceStatistics(residual, covariance []float64, residualCovariance 
 	return math.Max(0, mat.Dot(residualVector, weightedResidual)), math.Max(0, redundancy), nil
 }
 
-func publicVarianceComponents(components []variance.Component) []VarianceComponentResult {
+func publicVarianceComponents(components []statistics.VarianceComponent) []VarianceComponentResult {
 	result := make([]VarianceComponentResult, len(components))
 	for i, component := range components {
 		result[i] = VarianceComponentResult{

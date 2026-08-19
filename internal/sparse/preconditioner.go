@@ -126,6 +126,124 @@ func (preconditioner *blockJacobiPreconditioner) Apply(destination, rhs []float6
 
 func (*blockJacobiPreconditioner) Name() string { return "block-jacobi" }
 
+type incompleteCholeskyPreconditioner struct {
+	size            int
+	rowStart        []int
+	columns         []int
+	values          []float64
+	diagonalOffsets []int
+}
+
+// NewIncompleteCholeskyPreconditioner builds an IC(0) factor using the lower
+// triangle's existing non-zero pattern. relativeShift adds a small diagonal
+// stabilization relative to each original diagonal entry; it changes only the
+// preconditioner, not the system solved by PCG.
+func NewIncompleteCholeskyPreconditioner(matrix *Matrix, relativeShift float64) (Preconditioner, error) {
+	if matrix == nil {
+		return nil, fmt.Errorf("sparse: IC(0) preconditioner requires a matrix")
+	}
+	if relativeShift < 0 || !finite(relativeShift) {
+		return nil, fmt.Errorf("sparse: IC(0) relative shift must be finite and non-negative")
+	}
+
+	result := &incompleteCholeskyPreconditioner{
+		size:            matrix.Size(),
+		rowStart:        make([]int, matrix.Size()+1),
+		columns:         make([]int, 0, len(matrix.columns)/2+matrix.Size()),
+		values:          make([]float64, 0, len(matrix.values)/2+matrix.Size()),
+		diagonalOffsets: make([]int, matrix.Size()),
+	}
+	for row := 0; row < matrix.Size(); row++ {
+		foundDiagonal := false
+		for offset := matrix.rowStart[row]; offset < matrix.rowStart[row+1]; offset++ {
+			column := matrix.columns[offset]
+			if column > row {
+				break
+			}
+			result.columns = append(result.columns, column)
+			result.values = append(result.values, matrix.values[offset])
+			if column == row {
+				foundDiagonal = true
+			}
+		}
+		if !foundDiagonal {
+			result.columns = append(result.columns, row)
+			result.values = append(result.values, 0)
+		}
+		result.diagonalOffsets[row] = len(result.values) - 1
+		result.rowStart[row+1] = len(result.values)
+	}
+
+	for row := 0; row < result.size; row++ {
+		rowStart := result.rowStart[row]
+		diagonalOffset := result.diagonalOffsets[row]
+		for offset := rowStart; offset < diagonalOffset; offset++ {
+			column := result.columns[offset]
+			value := result.values[offset]
+			left := rowStart
+			right := result.rowStart[column]
+			rightEnd := result.diagonalOffsets[column]
+			for left < offset && right < rightEnd {
+				leftColumn := result.columns[left]
+				rightColumn := result.columns[right]
+				switch {
+				case leftColumn < rightColumn:
+					left++
+				case leftColumn > rightColumn:
+					right++
+				default:
+					value -= result.values[left] * result.values[right]
+					left++
+					right++
+				}
+			}
+			pivot := result.values[result.diagonalOffsets[column]]
+			if pivot <= 0 || !finite(pivot) {
+				return nil, fmt.Errorf("%w: IC(0) invalid pivot at %d", ErrBreakdown, column)
+			}
+			result.values[offset] = value / pivot
+			if !finite(result.values[offset]) {
+				return nil, fmt.Errorf("%w: IC(0) non-finite factor at [%d,%d]", ErrBreakdown, row, column)
+			}
+		}
+
+		originalDiagonal := result.values[diagonalOffset]
+		pivot := originalDiagonal + relativeShift*math.Max(math.Abs(originalDiagonal), 1)
+		for offset := rowStart; offset < diagonalOffset; offset++ {
+			pivot -= result.values[offset] * result.values[offset]
+		}
+		if pivot <= 0 || !finite(pivot) {
+			return nil, fmt.Errorf("%w: IC(0) non-positive pivot at %d", ErrBreakdown, row)
+		}
+		result.values[diagonalOffset] = math.Sqrt(pivot)
+	}
+	return result, nil
+}
+
+func (preconditioner *incompleteCholeskyPreconditioner) Apply(destination, rhs []float64) error {
+	if preconditioner == nil || len(destination) != preconditioner.size || len(rhs) != preconditioner.size {
+		return fmt.Errorf("sparse: IC(0) preconditioner dimension mismatch")
+	}
+	for row := 0; row < preconditioner.size; row++ {
+		value := rhs[row]
+		for offset := preconditioner.rowStart[row]; offset < preconditioner.diagonalOffsets[row]; offset++ {
+			value -= preconditioner.values[offset] * destination[preconditioner.columns[offset]]
+		}
+		destination[row] = value / preconditioner.values[preconditioner.diagonalOffsets[row]]
+	}
+	for row := preconditioner.size - 1; row >= 0; row-- {
+		diagonal := preconditioner.values[preconditioner.diagonalOffsets[row]]
+		destination[row] /= diagonal
+		for offset := preconditioner.rowStart[row]; offset < preconditioner.diagonalOffsets[row]; offset++ {
+			column := preconditioner.columns[offset]
+			destination[column] -= preconditioner.values[offset] * destination[row]
+		}
+	}
+	return nil
+}
+
+func (*incompleteCholeskyPreconditioner) Name() string { return "ic0" }
+
 func validateProjectedZero(size, index int, project ProjectFunc) error {
 	if project == nil {
 		return fmt.Errorf("%w: invalid diagonal at %d", ErrBreakdown, index)

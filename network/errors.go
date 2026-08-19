@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/wfu-work/nav-adjust-go-lib/core"
-	"github.com/wfu-work/nav-adjust-go-lib/variance"
 )
 
 var (
@@ -36,7 +35,7 @@ var (
 	ErrUnsupportedMethod = errors.New("adjust: unsupported method")
 	// ErrInsufficientRedundancy indicates that at least one baseline group does
 	// not have enough independent residual information to estimate its scale.
-	ErrInsufficientRedundancy = variance.ErrInsufficientRedundancy
+	ErrInsufficientRedundancy = core.ErrInsufficientRedundancy
 )
 
 // ValidationError identifies a public input field and record that failed

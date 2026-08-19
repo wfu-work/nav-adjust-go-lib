@@ -16,6 +16,9 @@ const (
 	// SolverDense uses dense direct factorization and is the compatibility
 	// default for small and medium networks.
 	SolverDense SolverMethod = "dense"
+	// SolverAuto keeps full-covariance and small systems dense, then switches
+	// larger reduced-covariance systems to sparse PCG.
+	SolverAuto SolverMethod = "auto"
 	// SolverPCG uses a sparse normal matrix and preconditioned conjugate
 	// gradients. Exact constraints are handled by null-space projection.
 	SolverPCG SolverMethod = "pcg"
@@ -27,6 +30,9 @@ const (
 	PreconditionerJacobi PreconditionerMethod = "jacobi"
 	// PreconditionerBlockJacobi uses each station's 3-by-3 ENU diagonal block.
 	PreconditionerBlockJacobi PreconditionerMethod = "block-jacobi"
+	// PreconditionerIC0 uses an incomplete Cholesky factor with the normal
+	// matrix's existing sparse pattern.
+	PreconditionerIC0 PreconditionerMethod = "ic0"
 )
 
 const (
@@ -69,14 +75,16 @@ type RobustOptions struct {
 	MinWeight     float64      `json:"min_weight,omitempty"`
 }
 
-// SolverOptions controls the optional sparse iterative solver. Zero values
-// select the dense solver and documented PCG tolerances.
+// SolverOptions controls direct, automatic, and sparse iterative solution.
+// Zero values select the dense solver and documented PCG tolerances.
 type SolverOptions struct {
-	Method            SolverMethod         `json:"method,omitempty"`
-	Preconditioner    PreconditionerMethod `json:"preconditioner,omitempty"`
-	MaxIterations     int                  `json:"max_iterations,omitempty"`
-	RelativeTolerance float64              `json:"relative_tolerance,omitempty"`
-	AbsoluteTolerance float64              `json:"absolute_tolerance,omitempty"`
+	Method              SolverMethod         `json:"method,omitempty"`
+	DenseThreshold      int                  `json:"dense_threshold,omitempty"`
+	Preconditioner      PreconditionerMethod `json:"preconditioner,omitempty"`
+	PreconditionerShift float64              `json:"preconditioner_shift,omitempty"`
+	MaxIterations       int                  `json:"max_iterations,omitempty"`
+	RelativeTolerance   float64              `json:"relative_tolerance,omitempty"`
+	AbsoluteTolerance   float64              `json:"absolute_tolerance,omitempty"`
 }
 
 // VarianceComponentOptions controls optional baseline-group covariance-scale

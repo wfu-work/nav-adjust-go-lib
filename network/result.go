@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/wfu-work/nav-adjust-go-lib/quality"
+	"github.com/wfu-work/nav-adjust-go-lib/internal/statistics"
 )
 
 func buildNetworkResult(ctx context.Context, input ENUNetworkProblem, compiled compiledNetwork, solution networkSolve) (*ENUNetworkResult, error) {
@@ -180,7 +180,7 @@ func buildNetworkResult(ctx context.Context, input ENUNetworkProblem, compiled c
 	reweighted := hasDownweightedBaseline(solution.weights)
 	varianceEstimated := compiled.publicOptions.variance != nil
 	if adjustment.DOF > 0 && !reweighted && !varianceEstimated {
-		global, err := quality.ChiSquare(adjustment, compiled.publicOptions.confidence)
+		global, err := statistics.ChiSquare(adjustment, compiled.publicOptions.confidence)
 		if err != nil {
 			return nil, err
 		}

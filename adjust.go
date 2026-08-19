@@ -43,9 +43,11 @@ const (
 	// RobustHuber selects block-wise Huber weighting of complete ENU baselines.
 	RobustHuber               = model.RobustHuber
 	SolverDense               = model.SolverDense
+	SolverAuto                = model.SolverAuto
 	SolverPCG                 = model.SolverPCG
 	PreconditionerJacobi      = model.PreconditionerJacobi
 	PreconditionerBlockJacobi = model.PreconditionerBlockJacobi
+	PreconditionerIC0         = model.PreconditionerIC0
 	CovarianceFull            = model.CovarianceFull
 	CovarianceStationBlocks   = model.CovarianceStationBlocks
 	CovarianceNone            = model.CovarianceNone

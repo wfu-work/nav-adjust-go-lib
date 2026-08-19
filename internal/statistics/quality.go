@@ -1,5 +1,5 @@
-// Package quality implements common post-adjustment quality checks.
-package quality
+// Package statistics provides internal post-adjustment statistical helpers.
+package statistics
 
 import (
 	"fmt"
@@ -24,13 +24,13 @@ type GlobalTest struct {
 // ChiSquare tests Result.Objective against a chi-square distribution.
 func ChiSquare(result *adjust.Result, confidence float64) (GlobalTest, error) {
 	if result == nil || result.DOF <= 0 {
-		return GlobalTest{}, fmt.Errorf("quality: chi-square test requires positive degrees of freedom")
+		return GlobalTest{}, fmt.Errorf("statistics: chi-square test requires positive degrees of freedom")
 	}
 	if result.Objective < 0 || math.IsNaN(result.Objective) || math.IsInf(result.Objective, 0) {
-		return GlobalTest{}, fmt.Errorf("quality: chi-square test requires a finite non-negative objective")
+		return GlobalTest{}, fmt.Errorf("statistics: chi-square test requires a finite non-negative objective")
 	}
 	if confidence <= 0 || confidence >= 1 || math.IsNaN(confidence) || math.IsInf(confidence, 0) {
-		return GlobalTest{}, fmt.Errorf("quality: confidence must be between zero and one")
+		return GlobalTest{}, fmt.Errorf("statistics: confidence must be between zero and one")
 	}
 	distribution := distuv.ChiSquared{K: float64(result.DOF)}
 	alpha := 1 - confidence

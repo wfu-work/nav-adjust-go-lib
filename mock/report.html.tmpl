@@ -1,0 +1,613 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>{{.Title}}</title>
+  <style>
+    :root {
+      --ink: #172129;
+      --muted: #65717a;
+      --line: #d9e0e3;
+      --surface: #ffffff;
+      --canvas: #f4f6f7;
+      --green: #147d64;
+      --green-soft: #e8f4f0;
+      --red: #b9493b;
+      --red-soft: #fbecea;
+      --blue: #1f5a78;
+      --blue-soft: #eaf2f6;
+      --amber: #946200;
+      --amber-soft: #fff5d9;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background: var(--canvas);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-size: 14px;
+      line-height: 1.55;
+      letter-spacing: 0;
+    }
+
+    button, input, select { font: inherit; letter-spacing: 0; }
+
+    .report-header {
+      background: var(--ink);
+      color: #fff;
+      border-bottom: 4px solid {{if .Passed}}var(--green){{else}}var(--red){{end}};
+    }
+
+    .header-inner,
+    .report-main,
+    .report-footer {
+      width: min(1180px, calc(100% - 40px));
+      margin: 0 auto;
+    }
+
+    .header-inner {
+      min-height: 188px;
+      padding: 34px 0 30px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 32px;
+      align-items: end;
+    }
+
+    .product {
+      margin: 0 0 18px;
+      color: #afbdc5;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 34px;
+      line-height: 1.15;
+      font-weight: 760;
+    }
+
+    .header-copy {
+      max-width: 720px;
+      margin: 14px 0 0;
+      color: #c8d1d6;
+      font-size: 15px;
+    }
+
+    .suite-status {
+      min-width: 188px;
+      padding: 18px 20px;
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: 6px;
+      text-align: right;
+    }
+
+    .suite-status strong {
+      display: block;
+      color: {{if .Passed}}#55d4ad{{else}}#ff8c80{{end}};
+      font-size: 28px;
+      line-height: 1;
+    }
+
+    .suite-status span { color: #b8c4ca; }
+
+    .report-main { padding: 30px 0 54px; }
+
+    .summary-band {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .summary-item {
+      min-width: 0;
+      min-height: 94px;
+      padding: 18px 20px;
+      border-right: 1px solid var(--line);
+    }
+
+    .summary-item:last-child { border-right: 0; }
+
+    .summary-label {
+      display: block;
+      margin-bottom: 5px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .summary-value {
+      display: block;
+      overflow-wrap: anywhere;
+      font-size: 24px;
+      font-weight: 730;
+      line-height: 1.2;
+    }
+
+    .summary-value.small { font-size: 15px; line-height: 1.45; }
+
+    .overview {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(280px, .75fr);
+      gap: 24px;
+      margin-top: 24px;
+      padding: 24px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+    }
+
+    .section-title {
+      margin: 0 0 15px;
+      font-size: 17px;
+      line-height: 1.3;
+    }
+
+    .category-row {
+      display: grid;
+      grid-template-columns: minmax(120px, 180px) minmax(100px, 1fr) 76px;
+      gap: 12px;
+      align-items: center;
+      margin-top: 12px;
+    }
+
+    .category-name { font-weight: 650; }
+
+    .category-track {
+      height: 9px;
+      overflow: hidden;
+      background: #e8edef;
+      border-radius: 3px;
+    }
+
+    .category-fill {
+      height: 100%;
+      background: var(--green);
+    }
+
+    .category-count {
+      color: var(--muted);
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .run-meta {
+      padding-left: 24px;
+      border-left: 1px solid var(--line);
+    }
+
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 8px 0;
+      border-bottom: 1px solid #edf0f1;
+    }
+
+    .meta-row span:first-child { color: var(--muted); }
+    .meta-row span:last-child { text-align: right; font-weight: 600; }
+
+    .scenario-toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin: 30px 0 16px;
+      padding: 12px 0;
+      background: rgba(244,246,247,.96);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .toolbar-title { margin: 0; font-size: 20px; }
+
+    .filter-group {
+      display: inline-flex;
+      border: 1px solid #bfc9ce;
+      border-radius: 6px;
+      overflow: hidden;
+      background: var(--surface);
+    }
+
+    .filter-button {
+      min-width: 78px;
+      min-height: 38px;
+      padding: 8px 14px;
+      color: #40505a;
+      background: transparent;
+      border: 0;
+      border-right: 1px solid #d3dade;
+      cursor: pointer;
+    }
+
+    .filter-button:last-child { border-right: 0; }
+    .filter-button:hover { background: #f0f4f5; }
+    .filter-button[aria-pressed="true"] { color: #fff; background: var(--blue); }
+    .filter-button:focus-visible { outline: 3px solid #80b7cf; outline-offset: -3px; }
+
+    .visible-count { color: var(--muted); white-space: nowrap; }
+
+    .scenario-list { display: grid; gap: 18px; }
+
+    .scenario {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-left: 5px solid var(--green);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .scenario.failed { border-left-color: var(--red); }
+    .scenario[hidden] { display: none; }
+
+    .scenario-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 20px;
+      padding: 22px 24px 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .scenario-kicker {
+      margin: 0 0 6px;
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .scenario h3 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.3;
+    }
+
+    .scenario-description {
+      max-width: 780px;
+      margin: 8px 0 0;
+      color: var(--muted);
+    }
+
+    .status-badge {
+      align-self: start;
+      min-width: 68px;
+      padding: 6px 10px;
+      color: var(--green);
+      background: var(--green-soft);
+      border: 1px solid #b8dfd2;
+      border-radius: 4px;
+      text-align: center;
+      font-weight: 750;
+    }
+
+    .failed .status-badge { color: var(--red); background: var(--red-soft); border-color: #efc5bf; }
+
+    .scenario-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 22px;
+      padding: 11px 24px;
+      color: var(--muted);
+      background: #fafbfb;
+      border-bottom: 1px solid var(--line);
+      font-size: 12px;
+    }
+
+    .scenario-meta strong { color: #35444d; }
+
+    .error-box,
+    .warning-box {
+      margin: 18px 24px 0;
+      padding: 12px 14px;
+      border-radius: 4px;
+    }
+
+    .error-box { color: #7f2f26; background: var(--red-soft); border: 1px solid #efc5bf; }
+    .warning-box { color: #704d00; background: var(--amber-soft); border: 1px solid #eed696; }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      padding: 0 24px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .metric {
+      min-width: 0;
+      padding: 18px 12px 18px 0;
+    }
+
+    .metric-label { display: block; color: var(--muted); font-size: 11px; }
+    .metric-value { display: block; overflow-wrap: anywhere; font-size: 17px; font-weight: 720; font-variant-numeric: tabular-nums; }
+    .metric-unit { color: var(--muted); font-size: 11px; }
+
+    .scenario-section { padding: 18px 24px 22px; }
+    .scenario-section + .scenario-section { border-top: 1px solid var(--line); }
+
+    .scenario-section h4 { margin: 0 0 12px; font-size: 14px; }
+
+    .table-wrap { width: 100%; overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    th, td {
+      padding: 9px 10px;
+      border-bottom: 1px solid #e5eaec;
+      text-align: left;
+      vertical-align: top;
+      white-space: nowrap;
+    }
+
+    th { color: #55636c; background: #f5f7f8; font-weight: 700; }
+    tbody tr:last-child td { border-bottom: 0; }
+    .number { text-align: right; }
+
+    .check-mark {
+      display: inline-grid;
+      width: 20px;
+      height: 20px;
+      place-items: center;
+      color: #fff;
+      background: var(--green);
+      border-radius: 50%;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .check-mark.failed { background: var(--red); }
+
+    details { border-top: 1px solid var(--line); }
+
+    summary {
+      padding: 14px 24px;
+      color: var(--blue);
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    details[open] summary { border-bottom: 1px solid var(--line); }
+
+    .empty-state {
+      display: none;
+      padding: 44px 24px;
+      color: var(--muted);
+      background: var(--surface);
+      border: 1px dashed #bfc9ce;
+      border-radius: 6px;
+      text-align: center;
+    }
+
+    .empty-state.visible { display: block; }
+
+    .report-footer {
+      padding: 24px 0 34px;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+      font-size: 12px;
+    }
+
+    code {
+      color: #214f66;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    @media (max-width: 900px) {
+      .summary-band { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .summary-item { border-bottom: 1px solid var(--line); }
+      .summary-item:nth-child(2n) { border-right: 0; }
+      .summary-item:last-child { grid-column: 1 / -1; border-bottom: 0; }
+      .overview { grid-template-columns: 1fr; }
+      .run-meta { padding: 20px 0 0; border: 0; border-top: 1px solid var(--line); }
+      .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 640px) {
+      .header-inner, .report-main, .report-footer { width: min(100% - 24px, 1180px); }
+      .header-inner { min-height: 0; grid-template-columns: 1fr; padding: 26px 0; }
+      h1 { font-size: 28px; }
+      .suite-status { min-width: 0; text-align: left; }
+      .summary-band { grid-template-columns: 1fr; }
+      .summary-item, .summary-item:nth-child(2n), .summary-item:last-child { grid-column: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+      .summary-item:last-child { border-bottom: 0; }
+      .overview { padding: 18px; }
+      .category-row { grid-template-columns: 112px minmax(60px, 1fr) 60px; gap: 8px; }
+      .scenario-toolbar { position: static; align-items: flex-start; flex-direction: column; }
+      .filter-group { width: 100%; }
+      .filter-button { flex: 1; min-width: 0; }
+      .scenario-head { grid-template-columns: 1fr; padding: 18px; }
+      .status-badge { justify-self: start; }
+      .scenario-meta, summary { padding-left: 18px; padding-right: 18px; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0 18px; }
+      .scenario-section { padding: 16px 18px 18px; }
+      .metric-value { font-size: 15px; }
+    }
+
+    @media print {
+      body { background: #fff; }
+      .scenario-toolbar { display: none; }
+      .scenario { break-inside: avoid; }
+      details > * { display: block !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="report-header">
+    <div class="header-inner">
+      <div>
+        <p class="product">NAV-ADJUST-GO-LIB / DETERMINISTIC VALIDATION</p>
+        <h1>{{.Title}}</h1>
+        <p class="header-copy">基于确定性合成真值验证固定基准、随机模型、自由网、稳健估计、方差分量、稀疏求解和非线性迭代。</p>
+      </div>
+      <div class="suite-status" aria-label="总体状态">
+        <strong>{{status .Passed}}</strong>
+        <span>{{.PassCount}} / {{.Total}} 场景满足全部断言</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="report-main">
+    <section class="summary-band" aria-label="验证摘要">
+      <div class="summary-item"><span class="summary-label">通过率</span><span class="summary-value">{{passPercent .PassCount .Total}}%</span></div>
+      <div class="summary-item"><span class="summary-label">通过场景</span><span class="summary-value">{{.PassCount}}</span></div>
+      <div class="summary-item"><span class="summary-label">失败场景</span><span class="summary-value">{{.FailCount}}</span></div>
+      <div class="summary-item"><span class="summary-label">总运行时间</span><span class="summary-value">{{duration .Duration}}</span></div>
+      <div class="summary-item"><span class="summary-label">生成时间</span><span class="summary-value small">{{timefmt .GeneratedAt}}</span></div>
+    </section>
+
+    <section class="overview" aria-labelledby="overview-title">
+      <div>
+        <h2 class="section-title" id="overview-title">分类覆盖</h2>
+        {{range .Categories}}
+        <div class="category-row">
+          <span class="category-name">{{.Name}}</span>
+          <div class="category-track" aria-label="{{.Name}} 通过率"><div class="category-fill" style="width: {{passPercent .Passed .Total}}%"></div></div>
+          <span class="category-count">{{.Passed}} / {{.Total}}</span>
+        </div>
+        {{end}}
+      </div>
+      <div class="run-meta">
+        <h2 class="section-title">运行环境</h2>
+        <div class="meta-row"><span>Go</span><span>{{.GoVersion}}</span></div>
+        <div class="meta-row"><span>场景数</span><span>{{.Total}}</span></div>
+        <div class="meta-row"><span>结果判定</span><span>真值误差 + 诊断断言</span></div>
+        <div class="meta-row"><span>数据源</span><span>mock 确定性合成</span></div>
+      </div>
+    </section>
+
+    <section aria-labelledby="scenarios-title">
+      <div class="scenario-toolbar">
+        <div>
+          <h2 class="toolbar-title" id="scenarios-title">场景明细</h2>
+          <span class="visible-count" id="visible-count">显示 {{.Total}} 个场景</span>
+        </div>
+        <div class="filter-group" role="group" aria-label="结果筛选">
+          <button class="filter-button" type="button" data-filter="all" aria-pressed="true">全部</button>
+          <button class="filter-button" type="button" data-filter="passed" aria-pressed="false">通过</button>
+          <button class="filter-button" type="button" data-filter="failed" aria-pressed="false">失败</button>
+        </div>
+      </div>
+
+      <div class="scenario-list" id="scenario-list">
+        {{range .Scenarios}}
+        <article class="scenario {{if not .Passed}}failed{{end}}" data-status="{{if .Passed}}passed{{else}}failed{{end}}" id="scenario-{{.ID}}">
+          <div class="scenario-head">
+            <div>
+              <p class="scenario-kicker">{{.Category}} / {{.ID}}</p>
+              <h3>{{.Name}}</h3>
+              <p class="scenario-description">{{.Description}}</p>
+            </div>
+            <span class="status-badge">{{status .Passed}}</span>
+          </div>
+          <div class="scenario-meta">
+            <span><strong>输入</strong> {{.Input}}</span>
+            <span><strong>求解器</strong> {{if .Solver}}{{.Solver}}{{else}}n/a{{end}}</span>
+            <span><strong>耗时</strong> {{duration .Duration}}</span>
+          </div>
+          {{if .Error}}<div class="error-box"><strong>运行错误：</strong>{{.Error}}</div>{{end}}
+          {{if .Warnings}}<div class="warning-box"><strong>求解警告：</strong>{{range $i, $warning := .Warnings}}{{if $i}}；{{end}}{{$warning}}{{end}}</div>{{end}}
+          {{if .Metrics}}
+          <div class="metrics">
+            {{range .Metrics}}
+            <div class="metric"><span class="metric-label">{{.Label}}</span><span class="metric-value">{{.Value}} {{if .Unit}}<span class="metric-unit">{{.Unit}}</span>{{end}}</span></div>
+            {{end}}
+          </div>
+          {{end}}
+          {{if .Checks}}
+          <section class="scenario-section">
+            <h4>验证断言</h4>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>状态</th><th>检查项</th><th>期望</th><th>实际</th></tr></thead>
+                <tbody>
+                  {{range .Checks}}
+                  <tr><td><span class="check-mark {{if not .Passed}}failed{{end}}">{{if .Passed}}✓{{else}}×{{end}}</span></td><td>{{.Name}}</td><td>{{.Expected}}</td><td>{{.Actual}}</td></tr>
+                  {{end}}
+                </tbody>
+              </table>
+            </div>
+          </section>
+          {{end}}
+          {{if .Stations}}
+          <details>
+            <summary>真值坐标对照（{{len .Stations}} 行）</summary>
+            <section class="scenario-section">
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>站点</th><th class="number">真值 E</th><th class="number">真值 N</th><th class="number">真值 U</th><th class="number">平差 E</th><th class="number">平差 N</th><th class="number">平差 U</th><th class="number">三维误差 / m</th></tr></thead>
+                  <tbody>
+                    {{range .Stations}}
+                    <tr><td>{{.ID}}</td><td class="number">{{printf "%.5f" .Truth.East}}</td><td class="number">{{printf "%.5f" .Truth.North}}</td><td class="number">{{printf "%.5f" .Truth.Up}}</td><td class="number">{{printf "%.5f" .Adjusted.East}}</td><td class="number">{{printf "%.5f" .Adjusted.North}}</td><td class="number">{{printf "%.5f" .Adjusted.Up}}</td><td class="number">{{printf "%.6f" .Error}}</td></tr>
+                    {{end}}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </details>
+          {{end}}
+          {{if .Residuals}}
+          <details>
+            <summary>最大基线残差（{{len .Residuals}} 行）</summary>
+            <section class="scenario-section">
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>基线</th><th>分组</th><th class="number">残差模 / m</th><th class="number">最终权</th></tr></thead>
+                  <tbody>
+                    {{range .Residuals}}
+                    <tr><td>{{.ID}}</td><td>{{if .Group}}{{.Group}}{{else}}default{{end}}</td><td class="number">{{printf "%.6f" .Norm}}</td><td class="number">{{printf "%.6f" .Weight}}</td></tr>
+                    {{end}}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </details>
+          {{end}}
+        </article>
+        {{end}}
+      </div>
+      <div class="empty-state" id="empty-state">当前筛选条件下没有场景。</div>
+    </section>
+  </main>
+
+  <footer class="report-footer">
+    报告由 <code>go run ./cmd/mock-report</code> 生成。所有坐标误差均相对 mock 包内确定性真值计算。
+  </footer>
+
+  <script>
+    (() => {
+      const buttons = Array.from(document.querySelectorAll('[data-filter]'));
+      const scenarios = Array.from(document.querySelectorAll('.scenario'));
+      const count = document.getElementById('visible-count');
+      const empty = document.getElementById('empty-state');
+      const applyFilter = (filter) => {
+        let visible = 0;
+        scenarios.forEach((scenario) => {
+          const show = filter === 'all' || scenario.dataset.status === filter;
+          scenario.hidden = !show;
+          if (show) visible += 1;
+        });
+        buttons.forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.filter === filter)));
+        count.textContent = `显示 ${visible} 个场景`;
+        empty.classList.toggle('visible', visible === 0);
+      };
+      buttons.forEach((button) => button.addEventListener('click', () => applyFilter(button.dataset.filter)));
+    })();
+  </script>
+</body>
+</html>
+

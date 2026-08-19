@@ -1,0 +1,1481 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>NAV Adjust 数值验证报告</title>
+  <style>
+    :root {
+      --ink: #172129;
+      --muted: #65717a;
+      --line: #d9e0e3;
+      --surface: #ffffff;
+      --canvas: #f4f6f7;
+      --green: #147d64;
+      --green-soft: #e8f4f0;
+      --red: #b9493b;
+      --red-soft: #fbecea;
+      --blue: #1f5a78;
+      --blue-soft: #eaf2f6;
+      --amber: #946200;
+      --amber-soft: #fff5d9;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background: var(--canvas);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-size: 14px;
+      line-height: 1.55;
+      letter-spacing: 0;
+    }
+
+    button, input, select { font: inherit; letter-spacing: 0; }
+
+    .report-header {
+      background: var(--ink);
+      color: #fff;
+      border-bottom: 4px solid var(--green);
+    }
+
+    .header-inner,
+    .report-main,
+    .report-footer {
+      width: min(1180px, calc(100% - 40px));
+      margin: 0 auto;
+    }
+
+    .header-inner {
+      min-height: 188px;
+      padding: 34px 0 30px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 32px;
+      align-items: end;
+    }
+
+    .product {
+      margin: 0 0 18px;
+      color: #afbdc5;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 34px;
+      line-height: 1.15;
+      font-weight: 760;
+    }
+
+    .header-copy {
+      max-width: 720px;
+      margin: 14px 0 0;
+      color: #c8d1d6;
+      font-size: 15px;
+    }
+
+    .suite-status {
+      min-width: 188px;
+      padding: 18px 20px;
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: 6px;
+      text-align: right;
+    }
+
+    .suite-status strong {
+      display: block;
+      color: #55d4ad;
+      font-size: 28px;
+      line-height: 1;
+    }
+
+    .suite-status span { color: #b8c4ca; }
+
+    .report-main { padding: 30px 0 54px; }
+
+    .summary-band {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .summary-item {
+      min-width: 0;
+      min-height: 94px;
+      padding: 18px 20px;
+      border-right: 1px solid var(--line);
+    }
+
+    .summary-item:last-child { border-right: 0; }
+
+    .summary-label {
+      display: block;
+      margin-bottom: 5px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .summary-value {
+      display: block;
+      overflow-wrap: anywhere;
+      font-size: 24px;
+      font-weight: 730;
+      line-height: 1.2;
+    }
+
+    .summary-value.small { font-size: 15px; line-height: 1.45; }
+
+    .overview {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(280px, .75fr);
+      gap: 24px;
+      margin-top: 24px;
+      padding: 24px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+    }
+
+    .section-title {
+      margin: 0 0 15px;
+      font-size: 17px;
+      line-height: 1.3;
+    }
+
+    .category-row {
+      display: grid;
+      grid-template-columns: minmax(120px, 180px) minmax(100px, 1fr) 76px;
+      gap: 12px;
+      align-items: center;
+      margin-top: 12px;
+    }
+
+    .category-name { font-weight: 650; }
+
+    .category-track {
+      height: 9px;
+      overflow: hidden;
+      background: #e8edef;
+      border-radius: 3px;
+    }
+
+    .category-fill {
+      height: 100%;
+      background: var(--green);
+    }
+
+    .category-count {
+      color: var(--muted);
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .run-meta {
+      padding-left: 24px;
+      border-left: 1px solid var(--line);
+    }
+
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 8px 0;
+      border-bottom: 1px solid #edf0f1;
+    }
+
+    .meta-row span:first-child { color: var(--muted); }
+    .meta-row span:last-child { text-align: right; font-weight: 600; }
+
+    .scenario-toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin: 30px 0 16px;
+      padding: 12px 0;
+      background: rgba(244,246,247,.96);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .toolbar-title { margin: 0; font-size: 20px; }
+
+    .filter-group {
+      display: inline-flex;
+      border: 1px solid #bfc9ce;
+      border-radius: 6px;
+      overflow: hidden;
+      background: var(--surface);
+    }
+
+    .filter-button {
+      min-width: 78px;
+      min-height: 38px;
+      padding: 8px 14px;
+      color: #40505a;
+      background: transparent;
+      border: 0;
+      border-right: 1px solid #d3dade;
+      cursor: pointer;
+    }
+
+    .filter-button:last-child { border-right: 0; }
+    .filter-button:hover { background: #f0f4f5; }
+    .filter-button[aria-pressed="true"] { color: #fff; background: var(--blue); }
+    .filter-button:focus-visible { outline: 3px solid #80b7cf; outline-offset: -3px; }
+
+    .visible-count { color: var(--muted); white-space: nowrap; }
+
+    .scenario-list { display: grid; gap: 18px; }
+
+    .scenario {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-left: 5px solid var(--green);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .scenario.failed { border-left-color: var(--red); }
+    .scenario[hidden] { display: none; }
+
+    .scenario-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 20px;
+      padding: 22px 24px 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .scenario-kicker {
+      margin: 0 0 6px;
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .scenario h3 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.3;
+    }
+
+    .scenario-description {
+      max-width: 780px;
+      margin: 8px 0 0;
+      color: var(--muted);
+    }
+
+    .status-badge {
+      align-self: start;
+      min-width: 68px;
+      padding: 6px 10px;
+      color: var(--green);
+      background: var(--green-soft);
+      border: 1px solid #b8dfd2;
+      border-radius: 4px;
+      text-align: center;
+      font-weight: 750;
+    }
+
+    .failed .status-badge { color: var(--red); background: var(--red-soft); border-color: #efc5bf; }
+
+    .scenario-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 22px;
+      padding: 11px 24px;
+      color: var(--muted);
+      background: #fafbfb;
+      border-bottom: 1px solid var(--line);
+      font-size: 12px;
+    }
+
+    .scenario-meta strong { color: #35444d; }
+
+    .error-box,
+    .warning-box {
+      margin: 18px 24px 0;
+      padding: 12px 14px;
+      border-radius: 4px;
+    }
+
+    .error-box { color: #7f2f26; background: var(--red-soft); border: 1px solid #efc5bf; }
+    .warning-box { color: #704d00; background: var(--amber-soft); border: 1px solid #eed696; }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      padding: 0 24px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .metric {
+      min-width: 0;
+      padding: 18px 12px 18px 0;
+    }
+
+    .metric-label { display: block; color: var(--muted); font-size: 11px; }
+    .metric-value { display: block; overflow-wrap: anywhere; font-size: 17px; font-weight: 720; font-variant-numeric: tabular-nums; }
+    .metric-unit { color: var(--muted); font-size: 11px; }
+
+    .scenario-section { padding: 18px 24px 22px; }
+    .scenario-section + .scenario-section { border-top: 1px solid var(--line); }
+
+    .scenario-section h4 { margin: 0 0 12px; font-size: 14px; }
+
+    .table-wrap { width: 100%; overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    th, td {
+      padding: 9px 10px;
+      border-bottom: 1px solid #e5eaec;
+      text-align: left;
+      vertical-align: top;
+      white-space: nowrap;
+    }
+
+    th { color: #55636c; background: #f5f7f8; font-weight: 700; }
+    tbody tr:last-child td { border-bottom: 0; }
+    .number { text-align: right; }
+
+    .check-mark {
+      display: inline-grid;
+      width: 20px;
+      height: 20px;
+      place-items: center;
+      color: #fff;
+      background: var(--green);
+      border-radius: 50%;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .check-mark.failed { background: var(--red); }
+
+    details { border-top: 1px solid var(--line); }
+
+    summary {
+      padding: 14px 24px;
+      color: var(--blue);
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    details[open] summary { border-bottom: 1px solid var(--line); }
+
+    .empty-state {
+      display: none;
+      padding: 44px 24px;
+      color: var(--muted);
+      background: var(--surface);
+      border: 1px dashed #bfc9ce;
+      border-radius: 6px;
+      text-align: center;
+    }
+
+    .empty-state.visible { display: block; }
+
+    .report-footer {
+      padding: 24px 0 34px;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+      font-size: 12px;
+    }
+
+    code {
+      color: #214f66;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    @media (max-width: 900px) {
+      .summary-band { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .summary-item { border-bottom: 1px solid var(--line); }
+      .summary-item:nth-child(2n) { border-right: 0; }
+      .summary-item:last-child { grid-column: 1 / -1; border-bottom: 0; }
+      .overview { grid-template-columns: 1fr; }
+      .run-meta { padding: 20px 0 0; border: 0; border-top: 1px solid var(--line); }
+      .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 640px) {
+      .header-inner, .report-main, .report-footer { width: min(100% - 24px, 1180px); }
+      .header-inner { min-height: 0; grid-template-columns: 1fr; padding: 26px 0; }
+      h1 { font-size: 28px; }
+      .suite-status { min-width: 0; text-align: left; }
+      .summary-band { grid-template-columns: 1fr; }
+      .summary-item, .summary-item:nth-child(2n), .summary-item:last-child { grid-column: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+      .summary-item:last-child { border-bottom: 0; }
+      .overview { padding: 18px; }
+      .category-row { grid-template-columns: 112px minmax(60px, 1fr) 60px; gap: 8px; }
+      .scenario-toolbar { position: static; align-items: flex-start; flex-direction: column; }
+      .filter-group { width: 100%; }
+      .filter-button { flex: 1; min-width: 0; }
+      .scenario-head { grid-template-columns: 1fr; padding: 18px; }
+      .status-badge { justify-self: start; }
+      .scenario-meta, summary { padding-left: 18px; padding-right: 18px; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0 18px; }
+      .scenario-section { padding: 16px 18px 18px; }
+      .metric-value { font-size: 15px; }
+    }
+
+    @media print {
+      body { background: #fff; }
+      .scenario-toolbar { display: none; }
+      .scenario { break-inside: avoid; }
+      details > * { display: block !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="report-header">
+    <div class="header-inner">
+      <div>
+        <p class="product">NAV-ADJUST-GO-LIB / DETERMINISTIC VALIDATION</p>
+        <h1>NAV Adjust 数值验证报告</h1>
+        <p class="header-copy">基于确定性合成真值验证固定基准、随机模型、自由网、稳健估计、方差分量、稀疏求解和非线性迭代。</p>
+      </div>
+      <div class="suite-status" aria-label="总体状态">
+        <strong>通过</strong>
+        <span>9 / 9 场景满足全部断言</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="report-main">
+    <section class="summary-band" aria-label="验证摘要">
+      <div class="summary-item"><span class="summary-label">通过率</span><span class="summary-value">100%</span></div>
+      <div class="summary-item"><span class="summary-label">通过场景</span><span class="summary-value">9</span></div>
+      <div class="summary-item"><span class="summary-label">失败场景</span><span class="summary-value">0</span></div>
+      <div class="summary-item"><span class="summary-label">总运行时间</span><span class="summary-value">3.57 ms</span></div>
+      <div class="summary-item"><span class="summary-label">生成时间</span><span class="summary-value small">2026-08-19 21:32:00 CST</span></div>
+    </section>
+
+    <section class="overview" aria-labelledby="overview-title">
+      <div>
+        <h2 class="section-title" id="overview-title">分类覆盖</h2>
+        
+        <div class="category-row">
+          <span class="category-name">基准模型</span>
+          <div class="category-track" aria-label="基准模型 通过率"><div class="category-fill" style="width: 100%"></div></div>
+          <span class="category-count">2 / 2</span>
+        </div>
+        
+        <div class="category-row">
+          <span class="category-name">稳健估计</span>
+          <div class="category-track" aria-label="稳健估计 通过率"><div class="category-fill" style="width: 100%"></div></div>
+          <span class="category-count">2 / 2</span>
+        </div>
+        
+        <div class="category-row">
+          <span class="category-name">经典网平差</span>
+          <div class="category-track" aria-label="经典网平差 通过率"><div class="category-fill" style="width: 100%"></div></div>
+          <span class="category-count">1 / 1</span>
+        </div>
+        
+        <div class="category-row">
+          <span class="category-name">规模与求解器</span>
+          <div class="category-track" aria-label="规模与求解器 通过率"><div class="category-fill" style="width: 100%"></div></div>
+          <span class="category-count">1 / 1</span>
+        </div>
+        
+        <div class="category-row">
+          <span class="category-name">随机模型</span>
+          <div class="category-track" aria-label="随机模型 通过率"><div class="category-fill" style="width: 100%"></div></div>
+          <span class="category-count">2 / 2</span>
+        </div>
+        
+        <div class="category-row">
+          <span class="category-name">非线性平差</span>
+          <div class="category-track" aria-label="非线性平差 通过率"><div class="category-fill" style="width: 100%"></div></div>
+          <span class="category-count">1 / 1</span>
+        </div>
+        
+      </div>
+      <div class="run-meta">
+        <h2 class="section-title">运行环境</h2>
+        <div class="meta-row"><span>Go</span><span>go1.26.4</span></div>
+        <div class="meta-row"><span>场景数</span><span>9</span></div>
+        <div class="meta-row"><span>结果判定</span><span>真值误差 + 诊断断言</span></div>
+        <div class="meta-row"><span>数据源</span><span>mock 确定性合成</span></div>
+      </div>
+    </section>
+
+    <section aria-labelledby="scenarios-title">
+      <div class="scenario-toolbar">
+        <div>
+          <h2 class="toolbar-title" id="scenarios-title">场景明细</h2>
+          <span class="visible-count" id="visible-count">显示 9 个场景</span>
+        </div>
+        <div class="filter-group" role="group" aria-label="结果筛选">
+          <button class="filter-button" type="button" data-filter="all" aria-pressed="true">全部</button>
+          <button class="filter-button" type="button" data-filter="passed" aria-pressed="false">通过</button>
+          <button class="filter-button" type="button" data-filter="failed" aria-pressed="false">失败</button>
+        </div>
+      </div>
+
+      <div class="scenario-list" id="scenario-list">
+        
+        <article class="scenario " data-status="passed" id="scenario-fixed-datum">
+          <div class="scenario-head">
+            <div>
+              <p class="scenario-kicker">经典网平差 / fixed-datum</p>
+              <h3>固定站闭合网</h3>
+              <p class="scenario-description">一个固定控制站和六条冗余 ENU 基线，验证稠密 Cholesky、闭合约束与完整协方差输出。</p>
+            </div>
+            <span class="status-badge">通过</span>
+          </div>
+          <div class="scenario-meta">
+            <span><strong>输入</strong> 4 站 / 6 基线 / 0 坐标先验</span>
+            <span><strong>求解器</strong> cholesky</span>
+            <span><strong>耗时</strong> 340 us</span>
+          </div>
+          
+          
+          
+          <div class="metrics">
+            
+            <div class="metric"><span class="metric-label">坐标 RMSE</span><span class="metric-value">0.003288 <span class="metric-unit">m</span></span></div>
+            
+            <div class="metric"><span class="metric-label">最大三维误差</span><span class="metric-value">0.005081 <span class="metric-unit">m</span></span></div>
+            
+            <div class="metric"><span class="metric-label">目标函数</span><span class="metric-value">0.022222 </span></div>
+            
+            <div class="metric"><span class="metric-label">单位权中误差</span><span class="metric-value">0.049690 </span></div>
+            
+            <div class="metric"><span class="metric-label">自由度</span><span class="metric-value">9 </span></div>
+            
+            <div class="metric"><span class="metric-label">求解迭代</span><span class="metric-value">0 </span></div>
+            
+          </div>
+          
+          
+          <section class="scenario-section">
+            <h4>验证断言</h4>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>状态</th><th>检查项</th><th>期望</th><th>实际</th></tr></thead>
+                <tbody>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>坐标真值误差</td><td>&lt;= 0.015 m</td><td>0.0050806 m</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>参数秩</td><td>rank = parameter count</td><td>9 / 9</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>迭代状态</td><td>converged</td><td>true</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>求解器路径</td><td>cholesky</td><td>cholesky</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>基准模式</td><td>external</td><td>external</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>协方差输出模式</td><td>full</td><td>full</td></tr>
+                  
+                </tbody>
+              </table>
+            </div>
+          </section>
+          
+          
+          <details>
+            <summary>真值坐标对照（4 行）</summary>
+            <section class="scenario-section">
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>站点</th><th class="number">真值 E</th><th class="number">真值 N</th><th class="number">真值 U</th><th class="number">平差 E</th><th class="number">平差 N</th><th class="number">平差 U</th><th class="number">三维误差 / m</th></tr></thead>
+                  <tbody>
+                    
+                    <tr><td>A</td><td class="number">100.00000</td><td class="number">-50.00000</td><td class="number">20.00000</td><td class="number">100.00000</td><td class="number">-50.00000</td><td class="number">20.00000</td><td class="number">0.000000</td></tr>
+                    
+                    <tr><td>B</td><td class="number">110.00000</td><td class="number">-48.00000</td><td class="number">20.50000</td><td class="number">110.00400</td><td class="number">-48.00275</td><td class="number">20.50150</td><td class="number">0.005081</td></tr>
+                    
+                    <tr><td>C</td><td class="number">108.00000</td><td class="number">-38.00000</td><td class="number">21.00000</td><td class="number">108.00125</td><td class="number">-38.00000</td><td class="number">21.00100</td><td class="number">0.001601</td></tr>
+                    
+                    <tr><td>D</td><td class="number">98.00000</td><td class="number">-40.00000</td><td class="number">19.50000</td><td class="number">98.00375</td><td class="number">-39.99925</td><td class="number">19.49950</td><td class="number">0.003857</td></tr>
+                    
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </details>
+          
+          
+          <details>
+            <summary>最大基线残差（6 行）</summary>
+            <section class="scenario-section">
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>基线</th><th>分组</th><th class="number">残差模 / m</th><th class="number">最终权</th></tr></thead>
+                  <tbody>
+                    
+                    <tr><td>BD</td><td>default</td><td class="number">0.001953</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>BC</td><td>default</td><td class="number">0.001541</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>DA</td><td>default</td><td class="number">0.001369</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>AC</td><td>default</td><td class="number">0.001031</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>CD</td><td>default</td><td class="number">0.000750</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>AB</td><td>default</td><td class="number">0.000559</td><td class="number">1.000000</td></tr>
+                    
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </details>
+          
+        </article>
+        
+        <article class="scenario " data-status="passed" id="scenario-correlated-covariance">
+          <div class="scenario-head">
+            <div>
+              <p class="scenario-kicker">随机模型 / correlated-covariance</p>
+              <h3>相关协方差网</h3>
+              <p class="scenario-description">每条观测携带含 E/N/U 相关项的完整 3x3 协方差，验证非对角随机模型和精度传播。</p>
+            </div>
+            <span class="status-badge">通过</span>
+          </div>
+          <div class="scenario-meta">
+            <span><strong>输入</strong> 4 站 / 6 基线 / 0 坐标先验</span>
+            <span><strong>求解器</strong> cholesky</span>
+            <span><strong>耗时</strong> 43 us</span>
+          </div>
+          
+          
+          
+          <div class="metrics">
+            
+            <div class="metric"><span class="metric-label">坐标 RMSE</span><span class="metric-value">0.006550 <span class="metric-unit">m</span></span></div>
+            
+            <div class="metric"><span class="metric-label">最大三维误差</span><span class="metric-value">0.008736 <span class="metric-unit">m</span></span></div>
+            
+            <div class="metric"><span class="metric-label">目标函数</span><span class="metric-value">0.118102 </span></div>
+            
+            <div class="metric"><span class="metric-label">单位权中误差</span><span class="metric-value">0.114553 </span></div>
+            
+            <div class="metric"><span class="metric-label">自由度</span><span class="metric-value">9 </span></div>
+            
+            <div class="metric"><span class="metric-label">求解迭代</span><span class="metric-value">0 </span></div>
+            
+          </div>
+          
+          
+          <section class="scenario-section">
+            <h4>验证断言</h4>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>状态</th><th>检查项</th><th>期望</th><th>实际</th></tr></thead>
+                <tbody>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>坐标真值误差</td><td>&lt;= 0.025 m</td><td>0.0087357 m</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>参数秩</td><td>rank = parameter count</td><td>9 / 9</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>迭代状态</td><td>converged</td><td>true</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>求解器路径</td><td>cholesky</td><td>cholesky</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>基准模式</td><td>external</td><td>external</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>协方差输出模式</td><td>full</td><td>full</td></tr>
+                  
+                </tbody>
+              </table>
+            </div>
+          </section>
+          
+          
+          <details>
+            <summary>真值坐标对照（4 行）</summary>
+            <section class="scenario-section">
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>站点</th><th class="number">真值 E</th><th class="number">真值 N</th><th class="number">真值 U</th><th class="number">平差 E</th><th class="number">平差 N</th><th class="number">平差 U</th><th class="number">三维误差 / m</th></tr></thead>
+                  <tbody>
+                    
+                    <tr><td>A</td><td class="number">100.00000</td><td class="number">-50.00000</td><td class="number">20.00000</td><td class="number">100.00000</td><td class="number">-50.00000</td><td class="number">20.00000</td><td class="number">0.000000</td></tr>
+                    
+                    <tr><td>B</td><td class="number">110.00000</td><td class="number">-48.00000</td><td class="number">20.50000</td><td class="number">110.00800</td><td class="number">-48.00025</td><td class="number">20.49650</td><td class="number">0.008736</td></tr>
+                    
+                    <tr><td>C</td><td class="number">108.00000</td><td class="number">-38.00000</td><td class="number">21.00000</td><td class="number">108.00225</td><td class="number">-37.99375</td><td class="number">20.99725</td><td class="number">0.007189</td></tr>
+                    
+                    <tr><td>D</td><td class="number">98.00000</td><td class="number">-40.00000</td><td class="number">19.50000</td><td class="number">98.00575</td><td class="number">-39.99700</td><td class="number">19.50125</td><td class="number">0.006605</td></tr>
+                    
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </details>
+          
+          
+          <details>
+            <summary>最大基线残差（6 行）</summary>
+            <section class="scenario-section">
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>基线</th><th>分组</th><th class="number">残差模 / m</th><th class="number">最终权</th></tr></thead>
+                  <tbody>
+                    
+                    <tr><td>AC-cor</td><td>default</td><td class="number">0.004323</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>BC-cor</td><td>default</td><td class="number">0.003373</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>AB-cor</td><td>default</td><td class="number">0.003288</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>BD-cor</td><td>default</td><td class="number">0.002861</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>CD-cor</td><td>default</td><td class="number">0.002704</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>DA-cor</td><td>default</td><td class="number">0.001458</td><td class="number">1.000000</td></tr>
+                    
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </details>
+          
+        </article>
+        
+        <article class="scenario " data-status="passed" id="scenario-stochastic-control">
+          <div class="scenario-head">
+            <div>
+              <p class="scenario-kicker">基准模型 / stochastic-control</p>
+              <h3>软控制点网</h3>
+              <p class="scenario-description">不设置固定站，使用两个带协方差的坐标先验建立外部基准，验证软控制点残差和站点协方差块。</p>
+            </div>
+            <span class="status-badge">通过</span>
+          </div>
+          <div class="scenario-meta">
+            <span><strong>输入</strong> 4 站 / 5 基线 / 2 坐标先验</span>
+            <span><strong>求解器</strong> cholesky</span>
+            <span><strong>耗时</strong> 63 us</span>
+          </div>
+          
+          
+          
+          <div class="metrics">
+            
+            <div class="metric"><span class="metric-label">坐标 RMSE</span><span class="metric-value">0.008311 <span class="metric-unit">m</span></span></div>
+            
+            <div class="metric"><span class="metric-label">最大三维误差</span><span class="metric-value">0.009624 <span class="metric-unit">m</span></span></div>
+            
+            <div class="metric"><span class="metric-label">目标函数</span><span class="metric-value">0.189611 </span></div>
+            
+            <div class="metric"><span class="metric-label">单位权中误差</span><span class="metric-value">0.145148 </span></div>
+            
+            <div class="metric"><span class="metric-label">自由度</span><span class="metric-value">9 </span></div>
+            
+            <div class="metric"><span class="metric-label">求解迭代</span><span class="metric-value">0 </span></div>
+            
+          </div>
+          
+          
+          <section class="scenario-section">
+            <h4>验证断言</h4>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>状态</th><th>检查项</th><th>期望</th><th>实际</th></tr></thead>
+                <tbody>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>坐标真值误差</td><td>&lt;= 0.025 m</td><td>0.00962428 m</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>参数秩</td><td>rank = parameter count</td><td>12 / 12</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>迭代状态</td><td>converged</td><td>true</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>求解器路径</td><td>cholesky</td><td>cholesky</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>基准模式</td><td>external</td><td>external</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>协方差输出模式</td><td>station-blocks</td><td>station-blocks</td></tr>
+                  
+                </tbody>
+              </table>
+            </div>
+          </section>
+          
+          
+          <details>
+            <summary>真值坐标对照（4 行）</summary>
+            <section class="scenario-section">
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>站点</th><th class="number">真值 E</th><th class="number">真值 N</th><th class="number">真值 U</th><th class="number">平差 E</th><th class="number">平差 N</th><th class="number">平差 U</th><th class="number">三维误差 / m</th></tr></thead>
+                  <tbody>
+                    
+                    <tr><td>A</td><td class="number">100.00000</td><td class="number">-50.00000</td><td class="number">20.00000</td><td class="number">100.00126</td><td class="number">-50.00834</td><td class="number">19.99945</td><td class="number">0.008456</td></tr>
+                    
+                    <tr><td>B</td><td class="number">110.00000</td><td class="number">-48.00000</td><td class="number">20.50000</td><td class="number">110.00282</td><td class="number">-48.00919</td><td class="number">20.49956</td><td class="number">0.009624</td></tr>
+                    
+                    <tr><td>C</td><td class="number">108.00000</td><td class="number">-38.00000</td><td class="number">21.00000</td><td class="number">108.00237</td><td class="number">-38.00704</td><td class="number">20.99868</td><td class="number">0.007548</td></tr>
+                    
+                    <tr><td>D</td><td class="number">98.00000</td><td class="number">-40.00000</td><td class="number">19.50000</td><td class="number">98.00182</td><td class="number">-40.00719</td><td class="number">19.49956</td><td class="number">0.007431</td></tr>
+                    
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </details>
+          
+          
+          <details>
+            <summary>最大基线残差（5 行）</summary>
+            <section class="scenario-section">
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>基线</th><th>分组</th><th class="number">残差模 / m</th><th class="number">最终权</th></tr></thead>
+                  <tbody>
+                    
+                    <tr><td>AC-soft</td><td>default</td><td class="number">0.000834</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>DA-soft</td><td>default</td><td class="number">0.000485</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>AB-soft</td><td>default</td><td class="number">0.000485</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>BC-soft</td><td>default</td><td class="number">0.000485</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>CD-soft</td><td>default</td><td class="number">0.000485</td><td class="number">1.000000</td></tr>
+                    
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </details>
+          
+        </article>
+        
+        <article class="scenario " data-status="passed" id="scenario-free-centroid">
+          <div class="scenario-head">
+            <div>
+              <p class="scenario-kicker">基准模型 / free-centroid</p>
+              <h3>零质心自由网</h3>
+              <p class="scenario-description">全网无固定站和先验，以三个精确零质心约束定义内部基准，并强制走稀疏投影 PCG。</p>
+            </div>
+            <span class="status-badge">通过</span>
+          </div>
+          <div class="scenario-meta">
+            <span><strong>输入</strong> 5 站 / 7 基线 / 0 坐标先验</span>
+            <span><strong>求解器</strong> sparse-projected-pcg</span>
+            <span><strong>耗时</strong> 52 us</span>
+          </div>
+          
+          <div class="warning-box"><strong>求解警告：</strong>free-network centroid datum applied to 1 unanchored component(s); coordinates are internal-datum coordinates</div>
+          
+          <div class="metrics">
+            
+            <div class="metric"><span class="metric-label">坐标 RMSE</span><span class="metric-value">0.000710 <span class="metric-unit">m</span></span></div>
+            
+            <div class="metric"><span class="metric-label">最大三维误差</span><span class="metric-value">0.000949 <span class="metric-unit">m</span></span></div>
+            
+            <div class="metric"><span class="metric-label">目标函数</span><span class="metric-value">0.033843 </span></div>
+            
+            <div class="metric"><span class="metric-label">单位权中误差</span><span class="metric-value">0.061321 </span></div>
+            
+            <div class="metric"><span class="metric-label">自由度</span><span class="metric-value">9 </span></div>
+            
+            <div class="metric"><span class="metric-label">求解迭代</span><span class="metric-value">2 </span></div>
+            
+          </div>
+          
+          
+          <section class="scenario-section">
+            <h4>验证断言</h4>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>状态</th><th>检查项</th><th>期望</th><th>实际</th></tr></thead>
+                <tbody>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>坐标真值误差</td><td>&lt;= 0.004 m</td><td>0.000948683 m</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>参数秩</td><td>rank = parameter count</td><td>15 / 15</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>迭代状态</td><td>converged</td><td>true</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>求解器路径</td><td>sparse-projected-pcg</td><td>sparse-projected-pcg</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>预条件器</td><td>ic0</td><td>ic0</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>基准模式</td><td>free-centroid</td><td>free-centroid</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>协方差输出模式</td><td>none</td><td>none</td></tr>
+                  
+                </tbody>
+              </table>
+            </div>
+          </section>
+          
+          
+          <details>
+            <summary>真值坐标对照（5 行）</summary>
+            <section class="scenario-section">
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>站点</th><th class="number">真值 E</th><th class="number">真值 N</th><th class="number">真值 U</th><th class="number">平差 E</th><th class="number">平差 N</th><th class="number">平差 U</th><th class="number">三维误差 / m</th></tr></thead>
+                  <tbody>
+                    
+                    <tr><td>A</td><td class="number">-10.00000</td><td class="number">-4.00000</td><td class="number">-1.00000</td><td class="number">-10.00067</td><td class="number">-3.99987</td><td class="number">-1.00027</td><td class="number">0.000730</td></tr>
+                    
+                    <tr><td>B</td><td class="number">0.00000</td><td class="number">-6.00000</td><td class="number">0.50000</td><td class="number">0.00012</td><td class="number">-6.00045</td><td class="number">0.50052</td><td class="number">0.000703</td></tr>
+                    
+                    <tr><td>C</td><td class="number">12.00000</td><td class="number">-1.00000</td><td class="number">1.00000</td><td class="number">12.00038</td><td class="number">-0.99995</td><td class="number">0.99978</td><td class="number">0.000440</td></tr>
+                    
+                    <tr><td>D</td><td class="number">8.00000</td><td class="number">7.00000</td><td class="number">-0.50000</td><td class="number">7.99967</td><td class="number">6.99947</td><td class="number">-0.49993</td><td class="number">0.000632</td></tr>
+                    
+                    <tr><td>E</td><td class="number">-10.00000</td><td class="number">4.00000</td><td class="number">0.00000</td><td class="number">-9.99950</td><td class="number">4.00080</td><td class="number">-0.00010</td><td class="number">0.000949</td></tr>
+                    
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </details>
+          
+          
+          <details>
+            <summary>最大基线残差（7 行）</summary>
+            <section class="scenario-section">
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>基线</th><th>分组</th><th class="number">残差模 / m</th><th class="number">最终权</th></tr></thead>
+                  <tbody>
+                    
+                    <tr><td>BD-free</td><td>default</td><td class="number">0.001159</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>CD-free</td><td>default</td><td class="number">0.000963</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>AC-free</td><td>default</td><td class="number">0.000963</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>AB-free</td><td>default</td><td class="number">0.000919</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>BC-free</td><td>default</td><td class="number">0.000612</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>DE-free</td><td>default</td><td class="number">0.000408</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>EA-free</td><td>default</td><td class="number">0.000408</td><td class="number">1.000000</td></tr>
+                    
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </details>
+          
+        </article>
+        
+        <article class="scenario " data-status="passed" id="scenario-robust-outlier">
+          <div class="scenario-head">
+            <div>
+              <p class="scenario-kicker">稳健估计 / robust-outlier</p>
+              <h3>粗差鲁棒网</h3>
+              <p class="scenario-description">在冗余闭合网中注入一条米级粗差，验证整条 ENU 基线的 Mahalanobis Huber 降权。</p>
+            </div>
+            <span class="status-badge">通过</span>
+          </div>
+          <div class="scenario-meta">
+            <span><strong>输入</strong> 4 站 / 7 基线 / 0 坐标先验</span>
+            <span><strong>求解器</strong> cholesky</span>
+            <span><strong>耗时</strong> 176 us</span>
+          </div>
+          
+          <div class="warning-box"><strong>求解警告：</strong>global chi-square test is omitted after data-dependent robust reweighting</div>
+          
+          <div class="metrics">
+            
+            <div class="metric"><span class="metric-label">坐标 RMSE</span><span class="metric-value">0.017216 <span class="metric-unit">m</span></span></div>
+            
+            <div class="metric"><span class="metric-label">最大三维误差</span><span class="metric-value">0.025574 <span class="metric-unit">m</span></span></div>
+            
+            <div class="metric"><span class="metric-label">目标函数</span><span class="metric-value">458.347162 </span></div>
+            
+            <div class="metric"><span class="metric-label">单位权中误差</span><span class="metric-value">6.180259 </span></div>
+            
+            <div class="metric"><span class="metric-label">自由度</span><span class="metric-value">12 </span></div>
+            
+            <div class="metric"><span class="metric-label">求解迭代</span><span class="metric-value">0 </span></div>
+            
+          </div>
+          
+          
+          <section class="scenario-section">
+            <h4>验证断言</h4>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>状态</th><th>检查项</th><th>期望</th><th>实际</th></tr></thead>
+                <tbody>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>坐标真值误差</td><td>&lt;= 0.04 m</td><td>0.0255741 m</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>参数秩</td><td>rank = parameter count</td><td>9 / 9</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>迭代状态</td><td>converged</td><td>true</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>求解器路径</td><td>cholesky</td><td>cholesky</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>基准模式</td><td>external</td><td>external</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>协方差输出模式</td><td>full</td><td>full</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>粗差基线降权</td><td>downweighted with weight &lt; 0.5</td><td>weight=0.01373, downweighted=true</td></tr>
+                  
+                </tbody>
+              </table>
+            </div>
+          </section>
+          
+          
+          <details>
+            <summary>真值坐标对照（4 行）</summary>
+            <section class="scenario-section">
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>站点</th><th class="number">真值 E</th><th class="number">真值 N</th><th class="number">真值 U</th><th class="number">平差 E</th><th class="number">平差 N</th><th class="number">平差 U</th><th class="number">三维误差 / m</th></tr></thead>
+                  <tbody>
+                    
+                    <tr><td>A</td><td class="number">100.00000</td><td class="number">-50.00000</td><td class="number">20.00000</td><td class="number">100.00000</td><td class="number">-50.00000</td><td class="number">20.00000</td><td class="number">0.000000</td></tr>
+                    
+                    <tr><td>B</td><td class="number">110.00000</td><td class="number">-48.00000</td><td class="number">20.50000</td><td class="number">110.01347</td><td class="number">-48.00882</td><td class="number">20.50341</td><td class="number">0.016463</td></tr>
+                    
+                    <tr><td>C</td><td class="number">108.00000</td><td class="number">-38.00000</td><td class="number">21.00000</td><td class="number">108.02145</td><td class="number">-38.01215</td><td class="number">21.00682</td><td class="number">0.025574</td></tr>
+                    
+                    <tr><td>D</td><td class="number">98.00000</td><td class="number">-40.00000</td><td class="number">19.50000</td><td class="number">98.01397</td><td class="number">-40.00732</td><td class="number">19.50341</td><td class="number">0.016141</td></tr>
+                    
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </details>
+          
+          
+          <details>
+            <summary>最大基线残差（7 行）</summary>
+            <section class="scenario-section">
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>基线</th><th>分组</th><th class="number">残差模 / m</th><th class="number">最终权</th></tr></thead>
+                  <tbody>
+                    
+                    <tr><td>gross-AC</td><td>survey</td><td class="number">3.716147</td><td class="number">0.013730</td></tr>
+                    
+                    <tr><td>CA-good</td><td>survey</td><td class="number">0.025782</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>DA-good</td><td>survey</td><td class="number">0.013116</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>BC-good</td><td>survey</td><td class="number">0.013116</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>AB-good</td><td>survey</td><td class="number">0.012163</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>CD-good</td><td>survey</td><td class="number">0.012163</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>BD-good</td><td>survey</td><td class="number">0.001581</td><td class="number">1.000000</td></tr>
+                    
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </details>
+          
+        </article>
+        
+        <article class="scenario " data-status="passed" id="scenario-variance-components">
+          <div class="scenario-head">
+            <div>
+              <p class="scenario-kicker">随机模型 / variance-components</p>
+              <h3>分组方差分量</h3>
+              <p class="scenario-description">同一网形包含精密组和噪声被低估组，验证组协方差尺度的迭代估计与排序。</p>
+            </div>
+            <span class="status-badge">通过</span>
+          </div>
+          <div class="scenario-meta">
+            <span><strong>输入</strong> 4 站 / 12 基线 / 0 坐标先验</span>
+            <span><strong>求解器</strong> cholesky</span>
+            <span><strong>耗时</strong> 653 us</span>
+          </div>
+          
+          <div class="warning-box"><strong>求解警告：</strong>global chi-square test is omitted after data-dependent variance-component estimation</div>
+          
+          <div class="metrics">
+            
+            <div class="metric"><span class="metric-label">坐标 RMSE</span><span class="metric-value">0.002981 <span class="metric-unit">m</span></span></div>
+            
+            <div class="metric"><span class="metric-label">最大三维误差</span><span class="metric-value">0.004651 <span class="metric-unit">m</span></span></div>
+            
+            <div class="metric"><span class="metric-label">目标函数</span><span class="metric-value">27.000000 </span></div>
+            
+            <div class="metric"><span class="metric-label">单位权中误差</span><span class="metric-value">1.000000 </span></div>
+            
+            <div class="metric"><span class="metric-label">自由度</span><span class="metric-value">27 </span></div>
+            
+            <div class="metric"><span class="metric-label">求解迭代</span><span class="metric-value">0 </span></div>
+            
+          </div>
+          
+          
+          <section class="scenario-section">
+            <h4>验证断言</h4>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>状态</th><th>检查项</th><th>期望</th><th>实际</th></tr></thead>
+                <tbody>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>坐标真值误差</td><td>&lt;= 0.04 m</td><td>0.00465065 m</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>参数秩</td><td>rank = parameter count</td><td>9 / 9</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>迭代状态</td><td>converged</td><td>true</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>求解器路径</td><td>cholesky</td><td>cholesky</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>基准模式</td><td>external</td><td>external</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>协方差输出模式</td><td>station-blocks</td><td>station-blocks</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>方差分量区分</td><td>ratio &gt;= 10</td><td>noisy=16.0427, precise=0.00327212, ratio=4.9e&#43;03</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>方差分量迭代</td><td>converged</td><td>true</td></tr>
+                  
+                </tbody>
+              </table>
+            </div>
+          </section>
+          
+          
+          <details>
+            <summary>真值坐标对照（4 行）</summary>
+            <section class="scenario-section">
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>站点</th><th class="number">真值 E</th><th class="number">真值 N</th><th class="number">真值 U</th><th class="number">平差 E</th><th class="number">平差 N</th><th class="number">平差 U</th><th class="number">三维误差 / m</th></tr></thead>
+                  <tbody>
+                    
+                    <tr><td>A</td><td class="number">100.00000</td><td class="number">-50.00000</td><td class="number">20.00000</td><td class="number">100.00000</td><td class="number">-50.00000</td><td class="number">20.00000</td><td class="number">0.000000</td></tr>
+                    
+                    <tr><td>B</td><td class="number">110.00000</td><td class="number">-48.00000</td><td class="number">20.50000</td><td class="number">110.00378</td><td class="number">-48.00252</td><td class="number">20.49900</td><td class="number">0.004651</td></tr>
+                    
+                    <tr><td>C</td><td class="number">108.00000</td><td class="number">-38.00000</td><td class="number">21.00000</td><td class="number">108.00126</td><td class="number">-37.99924</td><td class="number">20.99899</td><td class="number">0.001787</td></tr>
+                    
+                    <tr><td>D</td><td class="number">98.00000</td><td class="number">-40.00000</td><td class="number">19.50000</td><td class="number">98.00302</td><td class="number">-40.00126</td><td class="number">19.50001</td><td class="number">0.003273</td></tr>
+                    
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </details>
+          
+          
+          <details>
+            <summary>最大基线残差（8 行）</summary>
+            <section class="scenario-section">
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>基线</th><th>分组</th><th class="number">残差模 / m</th><th class="number">最终权</th></tr></thead>
+                  <tbody>
+                    
+                    <tr><td>n-BC</td><td>noisy</td><td class="number">0.154193</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>n-AC</td><td>noisy</td><td class="number">0.149907</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>n-BD</td><td>noisy</td><td class="number">0.143191</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>n-DA</td><td>noisy</td><td class="number">0.138957</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>n-CD</td><td>noisy</td><td class="number">0.138568</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>n-AB</td><td>noisy</td><td class="number">0.137720</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>p-AC</td><td>precise</td><td class="number">0.002140</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>p-BC</td><td>precise</td><td class="number">0.001509</td><td class="number">1.000000</td></tr>
+                    
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </details>
+          
+        </article>
+        
+        <article class="scenario " data-status="passed" id="scenario-sparse-auto-150">
+          <div class="scenario-head">
+            <div>
+              <p class="scenario-kicker">规模与求解器 / sparse-auto-150</p>
+              <h3>150 站稀疏网</h3>
+              <p class="scenario-description">150 个站点、链边与跨三站加固边，验证 Auto 阈值、CSR 法方程和 IC(0)-PCG。</p>
+            </div>
+            <span class="status-badge">通过</span>
+          </div>
+          <div class="scenario-meta">
+            <span><strong>输入</strong> 150 站 / 296 基线 / 0 坐标先验</span>
+            <span><strong>求解器</strong> sparse-pcg</span>
+            <span><strong>耗时</strong> 1.92 ms</span>
+          </div>
+          
+          
+          
+          <div class="metrics">
+            
+            <div class="metric"><span class="metric-label">坐标 RMSE</span><span class="metric-value">0.001878 <span class="metric-unit">m</span></span></div>
+            
+            <div class="metric"><span class="metric-label">最大三维误差</span><span class="metric-value">0.003186 <span class="metric-unit">m</span></span></div>
+            
+            <div class="metric"><span class="metric-label">目标函数</span><span class="metric-value">3.126507 </span></div>
+            
+            <div class="metric"><span class="metric-label">单位权中误差</span><span class="metric-value">0.084200 </span></div>
+            
+            <div class="metric"><span class="metric-label">自由度</span><span class="metric-value">441 </span></div>
+            
+            <div class="metric"><span class="metric-label">求解迭代</span><span class="metric-value">36 </span></div>
+            
+          </div>
+          
+          
+          <section class="scenario-section">
+            <h4>验证断言</h4>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>状态</th><th>检查项</th><th>期望</th><th>实际</th></tr></thead>
+                <tbody>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>坐标真值误差</td><td>&lt;= 0.05 m</td><td>0.00318612 m</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>参数秩</td><td>rank = parameter count</td><td>447 / 447</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>迭代状态</td><td>converged</td><td>true</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>求解器路径</td><td>sparse-pcg</td><td>sparse-pcg</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>预条件器</td><td>ic0</td><td>ic0</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>基准模式</td><td>external</td><td>external</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>协方差输出模式</td><td>none</td><td>none</td></tr>
+                  
+                </tbody>
+              </table>
+            </div>
+          </section>
+          
+          
+          <details>
+            <summary>真值坐标对照（12 行）</summary>
+            <section class="scenario-section">
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>站点</th><th class="number">真值 E</th><th class="number">真值 N</th><th class="number">真值 U</th><th class="number">平差 E</th><th class="number">平差 N</th><th class="number">平差 U</th><th class="number">三维误差 / m</th></tr></thead>
+                  <tbody>
+                    
+                    <tr><td>S000</td><td class="number">0.00000</td><td class="number">0.00000</td><td class="number">0.00000</td><td class="number">0.00000</td><td class="number">0.00000</td><td class="number">0.00000</td><td class="number">0.000000</td></tr>
+                    
+                    <tr><td>S001</td><td class="number">1.20000</td><td class="number">0.23974</td><td class="number">0.01000</td><td class="number">1.19848</td><td class="number">0.23801</td><td class="number">0.00888</td><td class="number">0.002562</td></tr>
+                    
+                    <tr><td>S002</td><td class="number">2.40000</td><td class="number">0.47795</td><td class="number">0.02000</td><td class="number">2.39823</td><td class="number">0.47768</td><td class="number">0.01970</td><td class="number">0.001817</td></tr>
+                    
+                    <tr><td>S003</td><td class="number">3.60000</td><td class="number">0.71311</td><td class="number">0.03000</td><td class="number">3.59952</td><td class="number">0.71334</td><td class="number">0.02937</td><td class="number">0.000822</td></tr>
+                    
+                    <tr><td>S004</td><td class="number">4.80000</td><td class="number">0.94370</td><td class="number">0.04000</td><td class="number">4.79971</td><td class="number">0.94528</td><td class="number">0.03993</td><td class="number">0.001608</td></tr>
+                    
+                    <tr><td>S005</td><td class="number">6.00000</td><td class="number">1.16826</td><td class="number">0.05000</td><td class="number">6.00069</td><td class="number">1.16794</td><td class="number">0.04984</td><td class="number">0.000773</td></tr>
+                    
+                    <tr><td>S006</td><td class="number">7.20000</td><td class="number">1.38534</td><td class="number">0.06000</td><td class="number">7.19813</td><td class="number">1.38545</td><td class="number">0.05862</td><td class="number">0.002326</td></tr>
+                    
+                    <tr><td>S007</td><td class="number">8.40000</td><td class="number">1.59356</td><td class="number">0.07000</td><td class="number">8.39817</td><td class="number">1.59520</td><td class="number">0.06989</td><td class="number">0.002461</td></tr>
+                    
+                    <tr><td>S008</td><td class="number">9.60000</td><td class="number">1.79159</td><td class="number">0.08000</td><td class="number">9.59967</td><td class="number">1.78940</td><td class="number">0.07937</td><td class="number">0.002302</td></tr>
+                    
+                    <tr><td>S147</td><td class="number">176.40000</td><td class="number">-2.16534</td><td class="number">1.47000</td><td class="number">176.39824</td><td class="number">-2.16295</td><td class="number">1.46984</td><td class="number">0.002972</td></tr>
+                    
+                    <tr><td>S148</td><td class="number">177.60000</td><td class="number">-1.99248</td><td class="number">1.48000</td><td class="number">177.59928</td><td class="number">-1.99485</td><td class="number">1.47921</td><td class="number">0.002601</td></tr>
+                    
+                    <tr><td>S149</td><td class="number">178.80000</td><td class="number">-1.80688</td><td class="number">1.49000</td><td class="number">178.80002</td><td class="number">-1.80939</td><td class="number">1.49020</td><td class="number">0.002520</td></tr>
+                    
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </details>
+          
+          
+          <details>
+            <summary>最大基线残差（8 行）</summary>
+            <section class="scenario-section">
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>基线</th><th>分组</th><th class="number">残差模 / m</th><th class="number">最终权</th></tr></thead>
+                  <tbody>
+                    
+                    <tr><td>brace-128</td><td>brace</td><td class="number">0.003606</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>brace-058</td><td>brace</td><td class="number">0.003606</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>brace-093</td><td>brace</td><td class="number">0.003606</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>brace-023</td><td>brace</td><td class="number">0.003606</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>brace-135</td><td>brace</td><td class="number">0.003360</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>brace-065</td><td>brace</td><td class="number">0.003355</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>brace-100</td><td>brace</td><td class="number">0.003355</td><td class="number">1.000000</td></tr>
+                    
+                    <tr><td>brace-030</td><td>brace</td><td class="number">0.003355</td><td class="number">1.000000</td></tr>
+                    
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </details>
+          
+        </article>
+        
+        <article class="scenario " data-status="passed" id="scenario-batch-huber">
+          <div class="scenario-head">
+            <div>
+              <p class="scenario-kicker">稳健估计 / batch-huber</p>
+              <h3>通用 Huber 线性平差</h3>
+              <p class="scenario-description">同一标量参数包含五个正常观测和一个大粗差，验证 batch.SolveHuber 的逐观测重加权。</p>
+            </div>
+            <span class="status-badge">通过</span>
+          </div>
+          <div class="scenario-meta">
+            <span><strong>输入</strong> 1 参数 / 6 独立观测</span>
+            <span><strong>求解器</strong> cholesky</span>
+            <span><strong>耗时</strong> 31 us</span>
+          </div>
+          
+          
+          
+          <div class="metrics">
+            
+            <div class="metric"><span class="metric-label">估计值</span><span class="metric-value">10.015000 </span></div>
+            
+            <div class="metric"><span class="metric-label">绝对误差</span><span class="metric-value">0.015000 </span></div>
+            
+            <div class="metric"><span class="metric-label">粗差权</span><span class="metric-value">0.001879 </span></div>
+            
+            <div class="metric"><span class="metric-label">迭代次数</span><span class="metric-value">14 </span></div>
+            
+          </div>
+          
+          
+          <section class="scenario-section">
+            <h4>验证断言</h4>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>状态</th><th>检查项</th><th>期望</th><th>实际</th></tr></thead>
+                <tbody>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>参数真值误差</td><td>&lt;= 0.03</td><td>0.015000</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>粗差观测降权</td><td>weight &lt; 0.1</td><td>0.001879</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>Huber 迭代</td><td>converged</td><td>true</td></tr>
+                  
+                </tbody>
+              </table>
+            </div>
+          </section>
+          
+          
+          
+        </article>
+        
+        <article class="scenario " data-status="passed" id="scenario-nonlinear-spp">
+          <div class="scenario-head">
+            <div>
+              <p class="scenario-kicker">非线性平差 / nonlinear-spp</p>
+              <h3>非线性伪距定位</h3>
+              <p class="scenario-description">六颗卫星的合成伪距通过 Gauss-Newton 反复线性化，联合估计 ECEF 坐标和接收机钟差。</p>
+            </div>
+            <span class="status-badge">通过</span>
+          </div>
+          <div class="scenario-meta">
+            <span><strong>输入</strong> 4 参数 / 6 伪距观测</span>
+            <span><strong>求解器</strong> cholesky</span>
+            <span><strong>耗时</strong> 15 us</span>
+          </div>
+          
+          
+          
+          <div class="metrics">
+            
+            <div class="metric"><span class="metric-label">ECEF 三维误差</span><span class="metric-value">0.224235 <span class="metric-unit">m</span></span></div>
+            
+            <div class="metric"><span class="metric-label">钟差误差</span><span class="metric-value">0.080194 <span class="metric-unit">m</span></span></div>
+            
+            <div class="metric"><span class="metric-label">Gauss-Newton 迭代</span><span class="metric-value">3 </span></div>
+            
+            <div class="metric"><span class="metric-label">单位权中误差</span><span class="metric-value">0.683436 </span></div>
+            
+          </div>
+          
+          
+          <section class="scenario-section">
+            <h4>验证断言</h4>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>状态</th><th>检查项</th><th>期望</th><th>实际</th></tr></thead>
+                <tbody>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>ECEF 真值误差</td><td>&lt;= 1 m</td><td>0.224235 m</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>钟差真值误差</td><td>&lt;= 1 m</td><td>0.0801938 m</td></tr>
+                  
+                  <tr><td><span class="check-mark ">✓</span></td><td>非线性收敛</td><td>converged within 6 iterations</td><td>converged=true, iterations=3</td></tr>
+                  
+                </tbody>
+              </table>
+            </div>
+          </section>
+          
+          
+          
+        </article>
+        
+      </div>
+      <div class="empty-state" id="empty-state">当前筛选条件下没有场景。</div>
+    </section>
+  </main>
+
+  <footer class="report-footer">
+    报告由 <code>go run ./cmd/mock-report</code> 生成。所有坐标误差均相对 mock 包内确定性真值计算。
+  </footer>
+
+  <script>
+    (() => {
+      const buttons = Array.from(document.querySelectorAll('[data-filter]'));
+      const scenarios = Array.from(document.querySelectorAll('.scenario'));
+      const count = document.getElementById('visible-count');
+      const empty = document.getElementById('empty-state');
+      const applyFilter = (filter) => {
+        let visible = 0;
+        scenarios.forEach((scenario) => {
+          const show = filter === 'all' || scenario.dataset.status === filter;
+          scenario.hidden = !show;
+          if (show) visible += 1;
+        });
+        buttons.forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.filter === filter)));
+        count.textContent = `显示 ${visible} 个场景`;
+        empty.classList.toggle('visible', visible === 0);
+      };
+      buttons.forEach((button) => button.addEventListener('click', () => applyFilter(button.dataset.filter)));
+    })();
+  </script>
+</body>
+</html>
+

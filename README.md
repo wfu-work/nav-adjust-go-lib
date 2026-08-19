@@ -527,6 +527,20 @@ case errors.Is(err, network.ErrInvalidProblem):
 
 `core/`、`batch/` 和 `nonlinear/` 保留了底层数值能力，供高级用法扩展；通用线性 Huber 入口现在是 `batch.SolveHuber`。面向站间 ENU 向量网时应优先使用 `model + network` API。本库聚焦静态平差，不再提供 Kalman 序贯滤波。
 
+## Mock 数据与验证报告
+
+`mock` 包提供带确定真值的合成数据和统一断言，覆盖固定站闭合网、相关协方差、软控制点、零质心自由网、整条 ENU 基线鲁棒降权、分组方差分量、150 站稀疏自动求解、通用线性 Huber 与非线性伪距定位。生成独立 HTML 报告：
+
+```bash
+go run ./cmd/mock-report
+```
+
+默认输出为 `reports/adjustment-validation.html`。任一场景发生求解错误、真值误差超限、秩或收敛状态异常、求解器路径不符时，命令会在写出完整失败报告后返回非零退出码，适合直接用于 CI。可通过 `-out` 修改输出位置：
+
+```bash
+go run ./cmd/mock-report -out /tmp/nav-adjust-report.html
+```
+
 ## 验证
 
 ```bash
@@ -535,6 +549,7 @@ go test -race ./...
 go vet ./...
 go run ./examples/enu-network
 go run ./examples/spp
+go run ./cmd/mock-report
 go test ./network -run=^$ -bench=BenchmarkAutoIC0Chain10000 -benchtime=1x -benchmem
 ```
 
